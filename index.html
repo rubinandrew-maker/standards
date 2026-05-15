@@ -387,11 +387,25 @@
       font-style: italic;
       line-height: 1.5;
     }
+    /* Week group */
+    .detail-sb-week { padding-bottom: 4px; }
+    .detail-sb-week + .detail-sb-week {
+      border-top: 1px solid var(--border);
+      padding-top: 4px;
+      margin-top: 2px;
+    }
+    .detail-sb-week-hdr {
+      font-size: .60rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--text-light);
+      padding: 5px 14px 2px;
+    }
     .detail-sb-row {
-      padding: 5px 14px;
+      padding: 4px 14px;
       font-size: .70rem;
       line-height: 1.5;
-      border-bottom: 1px solid transparent;
     }
     .detail-sb-row:hover { background: rgba(0,0,0,.03); }
     .detail-sb-code {
@@ -802,6 +816,44 @@ function compareAssessments(a, b) {
   return aS - bS;
 }
 
+/* ── Week helpers ───────────────────────────────────── */
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/* "2026-10-15" → local Date object */
+function isoToDate(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/* Return the Monday of the week containing isoDate */
+function mondayOf(isoDate) {
+  const dt  = isoToDate(isoDate);
+  const day = dt.getDay();                    // 0=Sun … 6=Sat
+  const diff = day === 0 ? -6 : 1 - day;     // days back to Monday
+  dt.setDate(dt.getDate() + diff);
+  return dt;
+}
+
+/* Format a Date as "May 5" */
+function fmtDateObj(dt) { return `${MONTHS[dt.getMonth()]} ${dt.getDate()}`; }
+
+/* "May 5 – May 11"  or  "Apr 28 – May 4" */
+function fmtWeekRange(monday) {
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 6);
+  return `${fmtDateObj(monday)} – ${fmtDateObj(sunday)}`;
+}
+
+/* Sortable ISO-style string for a week's Monday (for Map key & ordering) */
+function weekKey(isoDate) {
+  const mo = mondayOf(isoDate);
+  return [
+    mo.getFullYear(),
+    String(mo.getMonth() + 1).padStart(2, '0'),
+    String(mo.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
 /* =====================================================
    FIRESTORE — ENCODING / DECODING
 ===================================================== */
@@ -1147,22 +1199,17 @@ function toggleStrand(hdr) { hdr.parentElement.classList.toggle('collapsed'); }
    RENDER — ASSESSMENT TIMELINE SIDEBAR
 ===================================================== */
 function renderDetailSidebar() {
-  const u       = String(detailUnit);
+  const u        = String(detailUnit);
   const unitStds = assignments[currentGrade][u] || [];
   const unitData = (assessments[currentGrade] || {})[u] || {};
 
   // Collect every assessment row that has BOTH type and date
   const scheduled = [];
   unitStds.forEach(sid => {
-    const rows = unitData[sid] || [];
-    rows.forEach((row, i) => {
-      if (row.type && row.date) {
-        scheduled.push({ sid, rowIndex: i, type: row.type, date: row.date });
-      }
+    (unitData[sid] || []).forEach((row, i) => {
+      if (row.type && row.date) scheduled.push({ sid, rowIndex: i, type: row.type, date: row.date });
     });
   });
-
-  scheduled.sort(compareAssessments);
 
   const el = document.getElementById('detailSidebarBody');
   if (!el) return;
@@ -1172,11 +1219,26 @@ function renderDetailSidebar() {
     return;
   }
 
-  el.innerHTML = scheduled.map(item => `
-    <div class="detail-sb-row">
-      <span class="detail-sb-code">${item.sid}</span>
-      <span class="detail-sb-meta">Assessment ${item.rowIndex + 1} &nbsp;&middot;&nbsp; <span class="detail-sb-date">${fmtDate(item.date)}</span></span>
-    </div>`).join('');
+  // Group by calendar week (keyed by Monday's ISO date)
+  const weekMap = new Map(); // key → { label, items[] }
+  scheduled.forEach(item => {
+    const key = weekKey(item.date);
+    if (!weekMap.has(key)) weekMap.set(key, { label: fmtWeekRange(mondayOf(item.date)), items: [] });
+    weekMap.get(key).items.push(item);
+  });
+
+  // Sort weeks chronologically; sort items within each week
+  const sortedWeeks = [...weekMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  sortedWeeks.forEach(([, w]) => w.items.sort(compareAssessments));
+
+  el.innerHTML = sortedWeeks.map(([, w]) => {
+    const rows = w.items.map(item => `
+      <div class="detail-sb-row">
+        <span class="detail-sb-code">${item.sid}</span>
+        <span class="detail-sb-meta">Assessment ${item.rowIndex + 1} &nbsp;&middot;&nbsp; <span class="detail-sb-date">${fmtDate(item.date)}</span></span>
+      </div>`).join('');
+    return `<div class="detail-sb-week"><div class="detail-sb-week-hdr">${w.label}</div>${rows}</div>`;
+  }).join('');
 }
 
 /* =====================================================
