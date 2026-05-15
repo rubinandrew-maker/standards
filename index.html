@@ -351,6 +351,12 @@
     /* ── DETAIL VIEW ─────────────────────────────────────── */
     .detail-view {
       flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+    /* Scrollable main content column */
+    .detail-main {
+      flex: 1;
       overflow-y: auto;
       background: var(--bg);
       padding: 24px 20px 32px;
@@ -358,6 +364,50 @@
     .detail-inner {
       max-width: 860px;
       margin: 0 auto;
+    }
+    /* Assessment timeline sidebar (right side of detail view) */
+    .detail-sidebar {
+      width: 222px;
+      flex-shrink: 0;
+      background: var(--bg-sidebar);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .detail-sidebar-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 0 10px;
+    }
+    .detail-sb-empty {
+      padding: 14px 14px;
+      font-size: .70rem;
+      color: var(--text-light);
+      font-style: italic;
+      line-height: 1.5;
+    }
+    .detail-sb-row {
+      padding: 5px 14px;
+      font-size: .70rem;
+      line-height: 1.5;
+      border-bottom: 1px solid transparent;
+    }
+    .detail-sb-row:hover { background: rgba(0,0,0,.03); }
+    .detail-sb-code {
+      font-weight: 700;
+      color: var(--text);
+      display: block;
+      font-size: .67rem;
+      letter-spacing: .02em;
+    }
+    .detail-sb-meta {
+      color: var(--text-sec);
+      font-size: .67rem;
+    }
+    .detail-sb-date {
+      font-weight: 600;
+      color: var(--accent);
     }
     .detail-empty {
       padding: 70px 20px;
@@ -481,7 +531,15 @@
 
 <!-- ═══ UNIT DETAIL VIEW ════════════════════════════════ -->
 <div id="detailView" class="detail-view" style="display:none">
-  <div class="detail-inner" id="detailContent"></div>
+  <!-- Standards + assessment inputs -->
+  <div class="detail-main">
+    <div class="detail-inner" id="detailContent"></div>
+  </div>
+  <!-- Assessment timeline sidebar -->
+  <aside class="detail-sidebar">
+    <div class="pane-head"><h2>Assessment Timeline</h2></div>
+    <div class="detail-sidebar-body" id="detailSidebarBody"></div>
+  </aside>
 </div>
 
 <script>
@@ -706,6 +764,45 @@ function strandColor(stdId) {
 }
 
 /* =====================================================
+   ASSESSMENT TIMELINE HELPERS
+===================================================== */
+
+/* Format "2026-10-15" → "Oct 15" */
+function fmtDate(iso) {
+  if (!iso) return '';
+  const [, m, d] = iso.split('-').map(Number);
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${MONTHS[m - 1]} ${d}`;
+}
+
+/*
+ * Sort key for a standard ID.
+ * Primary:  the numeric portion (6.1 < 6.2 < 6.10)
+ * Secondary: strand order RL < RI < W < SL
+ */
+const STRAND_ORDER = { RL: 0, RI: 1, W: 2, SL: 3 };
+
+function stdSortKey(sid) {
+  const dot1 = sid.indexOf('.');
+  const prefix = sid.slice(0, dot1);               // "RL", "RI", "W", "SL"
+  const rest   = sid.slice(dot1 + 1);              // "6.1"
+  const num    = parseFloat(rest);                 // 6.1
+  return [num, STRAND_ORDER[prefix] ?? 99];
+}
+
+function compareAssessments(a, b) {
+  // 1. Date (ISO strings compare lexicographically — correct for dates)
+  if (a.date < b.date) return -1;
+  if (a.date > b.date) return  1;
+  // 2. Numeric portion of standard ID
+  const [aN, aS] = stdSortKey(a.sid);
+  const [bN, bS] = stdSortKey(b.sid);
+  if (aN !== bN) return aN - bN;
+  // 3. Strand order
+  return aS - bS;
+}
+
+/* =====================================================
    FIRESTORE — ENCODING / DECODING
 ===================================================== */
 /*
@@ -853,8 +950,8 @@ function switchGrade(g) { currentGrade = g; render(); }
 function updateAssessment(sid, rowIndex, field, value) {
   const rows = getAssessmentRows(currentGrade, detailUnit, sid);
   rows[rowIndex][field] = value;
+  renderDetailSidebar(); // update timeline instantly without touching the inputs
   writeToFirestore();
-  // No re-render here — we preserve input focus intentionally.
 }
 
 /* =====================================================
@@ -1047,6 +1144,42 @@ function renderUnits() {
 function toggleStrand(hdr) { hdr.parentElement.classList.toggle('collapsed'); }
 
 /* =====================================================
+   RENDER — ASSESSMENT TIMELINE SIDEBAR
+===================================================== */
+function renderDetailSidebar() {
+  const u       = String(detailUnit);
+  const unitStds = assignments[currentGrade][u] || [];
+  const unitData = (assessments[currentGrade] || {})[u] || {};
+
+  // Collect every assessment row that has BOTH type and date
+  const scheduled = [];
+  unitStds.forEach(sid => {
+    const rows = unitData[sid] || [];
+    rows.forEach((row, i) => {
+      if (row.type && row.date) {
+        scheduled.push({ sid, rowIndex: i, type: row.type, date: row.date });
+      }
+    });
+  });
+
+  scheduled.sort(compareAssessments);
+
+  const el = document.getElementById('detailSidebarBody');
+  if (!el) return;
+
+  if (scheduled.length === 0) {
+    el.innerHTML = `<div class="detail-sb-empty">No assessments scheduled yet</div>`;
+    return;
+  }
+
+  el.innerHTML = scheduled.map(item => `
+    <div class="detail-sb-row">
+      <span class="detail-sb-code">${item.sid}</span>
+      <span class="detail-sb-meta">Assessment ${item.rowIndex + 1} &nbsp;&middot;&nbsp; <span class="detail-sb-date">${fmtDate(item.date)}</span></span>
+    </div>`).join('');
+}
+
+/* =====================================================
    RENDER — UNIT DETAIL VIEW
 ===================================================== */
 function renderDetailView() {
@@ -1095,6 +1228,8 @@ function renderDetailView() {
         <div class="asmt-rows">${asmtRows}</div>
       </div>`;
   }).join('');
+
+  renderDetailSidebar();
 }
 
 /* =====================================================
