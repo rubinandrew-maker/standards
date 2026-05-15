@@ -1269,7 +1269,7 @@ function renderDetailSidebar() {
   const scheduled = [];
   unitStds.forEach(sid => {
     (unitData[sid] || []).forEach((row, i) => {
-      if (row.type && row.date) scheduled.push({ sid, rowIndex: i, type: row.type, date: row.date });
+      if (row.type && row.date) scheduled.push({ sid, rowIndex: i, type: row.type, date: row.date, description: row.description || '' });
     });
   });
 
@@ -1297,7 +1297,7 @@ function renderDetailSidebar() {
     const rows = w.items.map(item => `
       <div class="detail-sb-row">
         <span class="detail-sb-code">${item.sid}</span>
-        <span class="detail-sb-meta">Assessment ${item.rowIndex + 1} &nbsp;&middot;&nbsp; <span class="detail-sb-date">${fmtDate(item.date)}</span></span>
+        <span class="detail-sb-meta">${item.description || `Assessment ${item.rowIndex + 1}`} &nbsp;&middot;&nbsp; <span class="detail-sb-date">${fmtDate(item.date)}</span></span>
       </div>`).join('');
     return `<div class="detail-sb-week"><div class="detail-sb-week-hdr">${w.label}</div>${rows}</div>`;
   }).join('');
