@@ -458,14 +458,40 @@
       border-top: 1px solid var(--border);
       margin-bottom: 12px;
     }
-    .asmt-rows { display: flex; flex-direction: column; gap: 9px; }
-    .asmt-row { display: flex; align-items: center; gap: 12px; }
+    .asmt-rows { display: flex; flex-direction: column; gap: 11px; }
+    /* Each row is now two lines: controls on top, description below */
+    .asmt-row { display: flex; flex-direction: column; gap: 5px; }
+    .asmt-row-top { display: flex; align-items: center; gap: 12px; }
+    .asmt-row-bottom {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-left: 104px; /* label min-width(92) + gap(12) */
+    }
     .asmt-label {
       font-size: .72rem;
       font-weight: 600;
       color: var(--text-sec);
       min-width: 92px;
     }
+    .asmt-desc {
+      flex: 1;
+      padding: 5px 8px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font: 400 .78rem 'Inter', sans-serif;
+      color: var(--text);
+      background: var(--bg-card);
+    }
+    .asmt-desc:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+    .asmt-word-count {
+      font-size: .63rem;
+      color: var(--text-light);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+    .asmt-word-count.at-limit { color: #C0392B; font-weight: 600; }
     .asmt-select {
       padding: 5px 8px;
       border: 1px solid var(--border);
@@ -764,7 +790,7 @@ function makeDefaultAssessments() {
 function getAssessmentRows(grade, unit, sid) {
   const u = String(unit);
   if (!assessments[grade][u])      assessments[grade][u] = {};
-  if (!assessments[grade][u][sid]) assessments[grade][u][sid] = [{ type:'', date:'' }, { type:'', date:'' }];
+  if (!assessments[grade][u][sid]) assessments[grade][u][sid] = [{ type:'', date:'', description:'' }, { type:'', date:'', description:'' }];
   return assessments[grade][u][sid];
 }
 
@@ -1196,6 +1222,42 @@ function renderUnits() {
 function toggleStrand(hdr) { hdr.parentElement.classList.toggle('collapsed'); }
 
 /* =====================================================
+   DESCRIPTION INPUT HELPERS
+===================================================== */
+const MAX_WORDS = 10;
+
+function wordCount(text) {
+  return text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+}
+
+/*
+ * Called oninput on the description field.
+ * Enforces the 10-word cap by trimming excess words, then saves.
+ * The counter span is always the next sibling of the input.
+ */
+function handleDescInput(sid, rowIndex, inputEl) {
+  let val   = inputEl.value;
+  let count = wordCount(val);
+
+  // Hard cap: if over the limit, trim to the first MAX_WORDS words.
+  // This lets users edit within existing words but blocks new word 11.
+  if (count > MAX_WORDS) {
+    val = val.trim().split(/\s+/).slice(0, MAX_WORDS).join(' ');
+    inputEl.value = val;
+    count = MAX_WORDS;
+  }
+
+  // Update counter badge (next sibling of input)
+  const counterEl = inputEl.nextElementSibling;
+  if (counterEl) {
+    counterEl.textContent = `${count}/${MAX_WORDS}`;
+    counterEl.className = 'asmt-word-count' + (count >= MAX_WORDS ? ' at-limit' : '');
+  }
+
+  updateAssessment(sid, rowIndex, 'description', val);
+}
+
+/* =====================================================
    RENDER — ASSESSMENT TIMELINE SIDEBAR
 ===================================================== */
 function renderDetailSidebar() {
@@ -1265,20 +1327,29 @@ function renderDetailView() {
     const rows  = getAssessmentRows(currentGrade, detailUnit, sid);
 
     const asmtRows = [0, 1].map(i => {
-      const row = rows[i] || { type:'', date:'' };
-      // Escape sid for inline handler — IDs only contain letters, digits, dots; no escaping needed
+      const row  = rows[i] || { type:'', date:'', description:'' };
+      const desc = row.description || '';
+      const wc   = wordCount(desc);
       return `
         <div class="asmt-row">
-          <span class="asmt-label">Assessment ${i + 1}</span>
-          <select class="asmt-select"
-                  onchange="updateAssessment('${sid}',${i},'type',this.value)">
-            <option value=""            ${row.type===''            ?'selected':''}>&#8212; select type &#8212;</option>
-            <option value="Quiz"        ${row.type==='Quiz'        ?'selected':''}>Quiz</option>
-            <option value="Writing Task"${row.type==='Writing Task'?'selected':''}>Writing Task</option>
-            <option value="Project"     ${row.type==='Project'     ?'selected':''}>Project</option>
-          </select>
-          <input type="date" class="asmt-date" value="${row.date || ''}"
-                 onchange="updateAssessment('${sid}',${i},'date',this.value)">
+          <div class="asmt-row-top">
+            <span class="asmt-label">Assessment ${i + 1}</span>
+            <select class="asmt-select"
+                    onchange="updateAssessment('${sid}',${i},'type',this.value)">
+              <option value=""            ${row.type===''            ?'selected':''}>&#8212; select type &#8212;</option>
+              <option value="Quiz"        ${row.type==='Quiz'        ?'selected':''}>Quiz</option>
+              <option value="Writing Task"${row.type==='Writing Task'?'selected':''}>Writing Task</option>
+              <option value="Project"     ${row.type==='Project'     ?'selected':''}>Project</option>
+            </select>
+            <input type="date" class="asmt-date" value="${row.date || ''}"
+                   onchange="updateAssessment('${sid}',${i},'date',this.value)">
+          </div>
+          <div class="asmt-row-bottom">
+            <input type="text" class="asmt-desc" placeholder="Brief description..."
+                   value="${desc.replace(/"/g, '&quot;')}"
+                   oninput="handleDescInput('${sid}',${i},this)">
+            <span class="asmt-word-count${wc >= MAX_WORDS ? ' at-limit' : ''}">${wc}/${MAX_WORDS}</span>
+          </div>
         </div>`;
     }).join('');
 
