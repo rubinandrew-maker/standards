@@ -348,6 +348,40 @@
     .unit--5 .unit-badge { background: var(--u5); }
     .unit--6 .unit-badge { background: var(--u6); }
 
+    /* ── ELA / HUMANITIES TOGGLE ─────────────────────────── */
+    .unit-type-toggle {
+      display: flex;
+      background: rgba(0,0,0,.07);
+      border-radius: 5px;
+      padding: 2px;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+    .toggle-btn {
+      padding: 3px 13px;
+      border: none;
+      border-radius: 3px;
+      background: transparent;
+      cursor: pointer;
+      font: 600 .72rem 'Inter', sans-serif;
+      color: var(--text-sec);
+      transition: background .14s, color .14s;
+    }
+    .toggle-btn.active {
+      background: var(--bg-card);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0,0,0,.12);
+    }
+
+    /* Humanities unit column — subtle header tint + "H" chip */
+    .unit-col.hum .unit-col-head { background: #F5F3FF; }
+    .hum-chip {
+      font-size: .53rem; font-weight: 800; text-transform: uppercase;
+      letter-spacing: .04em; padding: 1px 4px; border-radius: 3px;
+      background: #DDD6FE; color: #5B21B6;
+      flex-shrink: 0; line-height: 1.5;
+    }
+
     /* ── DETAIL VIEW ─────────────────────────────────────── */
     .detail-view {
       flex: 1;
@@ -695,6 +729,7 @@
   <div class="unit-area">
     <div class="unit-area-head">
       <div class="pane-head" style="padding:0;border:none"><h2>Unit Assignments</h2></div>
+      <div id="unitTypeToggle"></div>
       <span class="unit-area-hint">Drop standards or content into any unit &middot; Double-click a unit to view detail</span>
     </div>
     <div class="unit-grid" id="unitGrid"></div>
@@ -911,10 +946,15 @@ const STANDARDS = {
 /* =====================================================
    STATE
 ===================================================== */
-let currentGrade = '6';
-let currentView  = 'main'; // 'main' | 'unit'
-let detailUnit   = null;   // 1–6 when in unit detail view
+let currentGrade    = '6';
+let currentView     = 'main'; // 'main' | 'unit'
+let detailUnit      = null;   // 1–6 when in unit detail view
+let detailUnitType  = 'ela';  // 'ela' | 'hum' — set when opening unit detail
 
+/* Per-grade ELA / Humanities toggle state (not persisted; resets on page load) */
+let currentUnitType = { '6': 'ela', '7': 'ela', '8': 'ela' };
+
+/* ── ELA data ──────────────────────────────────────────── */
 let assignments  = makeDefaultAssignments();
 let assessments  = makeDefaultAssessments();
 
@@ -923,6 +963,16 @@ let performanceAssignments = makeDefaultPoolAssignments();
 let genreDetails           = makeDefaultDetails();
 let performanceDetails     = makeDefaultDetails();
 let unitDetails            = makeDefaultUnitDetails();
+
+/* ── Humanities data (parallel structures) ────────────── */
+let humAssignments  = makeDefaultAssignments();
+let humAssessments  = makeDefaultAssessments();
+
+let humGenreAssignments = makeDefaultPoolAssignments();
+let humPerfAssignments  = makeDefaultPoolAssignments();
+let humGenreDetails     = makeDefaultDetails();
+let humPerfDetails      = makeDefaultDetails();
+let humUnitDetails      = makeDefaultUnitDetails();
 
 function makeDefaultAssignments() {
   const a = {};
@@ -976,10 +1026,11 @@ function makeDefaultUnitDetails() {
 
 /* Return the 2-row assessment array for a given standard, auto-initializing if absent */
 function getAssessmentRows(grade, unit, sid) {
-  const u = String(unit);
-  if (!assessments[grade][u])      assessments[grade][u] = {};
-  if (!assessments[grade][u][sid]) assessments[grade][u][sid] = [{ type:'', date:'', description:'' }, { type:'', date:'', description:'' }];
-  return assessments[grade][u][sid];
+  const u     = String(unit);
+  const asmts = activeAssessments();
+  if (!asmts[grade][u])      asmts[grade][u] = {};
+  if (!asmts[grade][u][sid]) asmts[grade][u][sid] = [{ type:'', date:'', description:'' }, { type:'', date:'', description:'' }];
+  return asmts[grade][u][sid];
 }
 
 /* Look up the strand color for a standard ID */
@@ -1268,6 +1319,14 @@ function startSync() {
       genreDetails           = decodeDetailMap(data.genreDetails);
       performanceDetails     = decodeDetailMap(data.performanceDetails);
       unitDetails            = decodeUnitDetails(data.unitDetails);
+      /* Humanities */
+      humAssignments      = decodeUnits(data.humanitiesUnits);
+      humAssessments      = decodeAssessments(data.humanitiesAssessments);
+      humGenreAssignments = decodePoolAssignments(data.humanitiesGenreAssignments);
+      humPerfAssignments  = decodePoolAssignments(data.humanitiesPerfAssignments);
+      humGenreDetails     = decodeDetailMap(data.humanitiesGenreDetails);
+      humPerfDetails      = decodeDetailMap(data.humanitiesPerfDetails);
+      humUnitDetails      = decodeUnitDetails(data.humanitiesUnitDetails);
       // Only auto-re-render the main view from snapshots;
       // in detail view we skip re-render to preserve input focus.
       if (currentView === 'main') render();
@@ -1289,6 +1348,14 @@ async function writeToFirestore() {
       genreDetails:           encodeDetailMap(genreDetails),
       performanceDetails:     encodeDetailMap(performanceDetails),
       unitDetails:            encodeUnitDetails(unitDetails),
+      /* Humanities */
+      humanitiesUnits:             encodeUnits(humAssignments),
+      humanitiesAssessments:       encodeAssessments(humAssessments),
+      humanitiesGenreAssignments:  encodePoolAssignments(humGenreAssignments),
+      humanitiesPerfAssignments:   encodePoolAssignments(humPerfAssignments),
+      humanitiesGenreDetails:      encodeDetailMap(humGenreDetails),
+      humanitiesPerfDetails:       encodeDetailMap(humPerfDetails),
+      humanitiesUnitDetails:       encodeUnitDetails(humUnitDetails),
     });
   } catch (err) {
     console.error('Firestore write error:', err);
@@ -1297,21 +1364,49 @@ async function writeToFirestore() {
 }
 
 /* =====================================================
+   ACTIVE-CONTEXT HELPERS
+   Returns true when the current operation (main view or detail
+   view) is operating on the Humanities data set.
+===================================================== */
+function isHum() {
+  return currentView === 'unit'
+    ? detailUnitType === 'hum'
+    : currentUnitType[currentGrade] === 'hum';
+}
+
+function activeAssignments()      { return isHum() ? humAssignments      : assignments; }
+function activeAssessments()      { return isHum() ? humAssessments      : assessments; }
+function activeGenreAssignments() { return isHum() ? humGenreAssignments : genreAssignments; }
+function activePerfAssignments()  { return isHum() ? humPerfAssignments  : performanceAssignments; }
+function activeGenreDetails()     { return isHum() ? humGenreDetails     : genreDetails; }
+function activePerfDetails()      { return isHum() ? humPerfDetails      : performanceDetails; }
+function activeUnitDetails()      { return isHum() ? humUnitDetails      : unitDetails; }
+
+/* Toggle between ELA and Humanities unit grids (per grade) */
+function switchUnitType(type) {
+  currentUnitType[currentGrade] = type;
+  renderUnitToggle();
+  renderUnits();
+}
+
+/* =====================================================
    MUTATIONS — UNIT ASSIGNMENTS
 ===================================================== */
 function addToUnit(sid, unit) {
-  const key = String(unit);
-  if (!assignments[currentGrade][key].includes(sid)) {
-    assignments[currentGrade][key].push(sid);
+  const key  = String(unit);
+  const asgn = activeAssignments();
+  if (!asgn[currentGrade][key].includes(sid)) {
+    asgn[currentGrade][key].push(sid);
     render();
     writeToFirestore();
   }
 }
 
 function removeFromUnit(sid, unit) {
-  const key = String(unit);
-  const arr = assignments[currentGrade][key];
-  const i   = arr.indexOf(sid);
+  const key  = String(unit);
+  const asgn = activeAssignments();
+  const arr  = asgn[currentGrade][key];
+  const i    = arr.indexOf(sid);
   if (i > -1) { arr.splice(i, 1); render(); writeToFirestore(); }
 }
 
@@ -1321,7 +1416,7 @@ function switchGrade(g) { currentGrade = g; render(); }
    MUTATIONS — POOL ITEMS (Genre & Performance)
 ===================================================== */
 function addPoolItem(poolType, label, unit) {
-  const pool = poolType === 'genre' ? genreAssignments : performanceAssignments;
+  const pool = poolType === 'genre' ? activeGenreAssignments() : activePerfAssignments();
   const key  = String(unit);
   if (!pool[currentGrade][key].includes(label)) {
     pool[currentGrade][key].push(label);
@@ -1333,7 +1428,7 @@ function addPoolItem(poolType, label, unit) {
 /* Called via data attributes on the remove button to avoid inline-JS escaping issues */
 function removePoolItem(btn) {
   const { poolType, label, unit } = btn.dataset;
-  const pool = poolType === 'genre' ? genreAssignments : performanceAssignments;
+  const pool = poolType === 'genre' ? activeGenreAssignments() : activePerfAssignments();
   const key  = String(unit);
   const arr  = pool[currentGrade][key];
   const i    = arr.indexOf(label);
@@ -1343,7 +1438,7 @@ function removePoolItem(btn) {
 /* Called oninput on pool detail textareas — saves without re-rendering to preserve focus */
 function updatePoolDetail(el) {
   const { poolType, label, unit } = el.dataset;
-  const detailMap = poolType === 'genre' ? genreDetails : performanceDetails;
+  const detailMap = poolType === 'genre' ? activeGenreDetails() : activePerfDetails();
   if (!detailMap[currentGrade][unit]) detailMap[currentGrade][unit] = {};
   detailMap[currentGrade][unit][label] = el.value;
   writeToFirestore();
@@ -1358,7 +1453,7 @@ function updatePoolDetail(el) {
  */
 function updateUnitDetailLine(fieldKey, index, value) {
   const u  = String(detailUnit);
-  const ud = unitDetails[currentGrade][u];
+  const ud = activeUnitDetails()[currentGrade][u];
   // Extend array defensively in case length < index
   while (ud[fieldKey].length <= index) ud[fieldKey].push('');
   ud[fieldKey][index] = value;
@@ -1372,7 +1467,7 @@ function updateUnitDetailLine(fieldKey, index, value) {
  */
 function revealNextLine(fieldKey) {
   const u  = String(detailUnit);
-  const ud = unitDetails[currentGrade][u];
+  const ud = activeUnitDetails()[currentGrade][u];
   // visibleCount: 0-length array means 1 line is shown by default
   const visible = ud[fieldKey].length === 0 ? 1 : ud[fieldKey].length;
   if (visible >= MAX_LINES) return;
@@ -1419,7 +1514,7 @@ function buildEuEqSection(fieldKey, sectionLabel, arr, u, accentColor) {
 
 function buildDetailTopHtml() {
   const u  = String(detailUnit);
-  const ud = (unitDetails[currentGrade] || {})[u] || { eu: [], eq: [] };
+  const ud = (activeUnitDetails()[currentGrade] || {})[u] || { eu: [], eq: [] };
   return (
     buildEuEqSection('eu', 'Enduring Understandings', ud.eu, u, '#E07B39') +
     buildEuEqSection('eq', 'Essential Questions',     ud.eq, u, '#1D3557')
@@ -1444,14 +1539,16 @@ function updateAssessment(sid, rowIndex, field, value) {
 /* =====================================================
    VIEW MANAGEMENT
 ===================================================== */
-function openUnitDetail(unit, evt) {
+function openUnitDetail(unit, evt, unitType) {
   // Ignore if the click originated from a remove button
   if (evt && evt.target.closest('.unit-std-remove')) return;
-  detailUnit  = unit;
-  currentView = 'unit';
+  detailUnit     = unit;
+  detailUnitType = unitType || currentUnitType[currentGrade];
+  currentView    = 'unit';
+  const typeLabel = detailUnitType === 'hum' ? 'Humanities ' : '';
   document.getElementById('mainCtrl').style.display   = 'none';
   document.getElementById('detailCtrl').style.display  = 'flex';
-  document.getElementById('detailTitle').textContent   = `Grade ${currentGrade} — Unit ${unit}`;
+  document.getElementById('detailTitle').textContent   = `Grade ${currentGrade} — ${typeLabel}Unit ${unit}`;
   document.getElementById('mainView').style.display    = 'none';
   document.getElementById('detailView').style.display  = 'flex';
   renderDetailView();
@@ -1470,16 +1567,41 @@ function closeUnitDetail() {
 /* =====================================================
    HELPERS
 ===================================================== */
-function getStdUnitMap() {
-  const map = {};
+/*
+ * ELA-only unit map — used by renderPool() for pip display on the active
+ * unit type (ELA or Hum). Returns { sid: [unitNums…] }.
+ */
+function getActiveStdUnitMap() {
+  const asgn = activeAssignments();
+  const map  = {};
   for (let u = 1; u <= 6; u++) {
-    for (const sid of (assignments[currentGrade][String(u)] || [])) {
+    for (const sid of (asgn[currentGrade][String(u)] || [])) {
       if (!map[sid]) map[sid] = [];
       map[sid].push(u);
     }
   }
   return map;
 }
+
+/*
+ * Combined ELA + Humanities unit map for the sidebar coverage counter.
+ * Returns { sid: count } (integer, max 12 per grade).
+ */
+function getCombinedStdCountMap() {
+  const counts = {};
+  for (let u = 1; u <= 6; u++) {
+    for (const sid of (assignments[currentGrade][String(u)] || [])) {
+      counts[sid] = (counts[sid] || 0) + 1;
+    }
+    for (const sid of (humAssignments[currentGrade][String(u)] || [])) {
+      counts[sid] = (counts[sid] || 0) + 1;
+    }
+  }
+  return counts;
+}
+
+/* Legacy alias — kept for any existing callers */
+function getStdUnitMap() { return getActiveStdUnitMap(); }
 
 function buildLookup(grade) {
   const m = {};
@@ -1538,18 +1660,29 @@ function renderTabs() {
     ['6','7','8'].map(g =>
       `<button class="grade-tab${g===currentGrade?' active':''}" onclick="switchGrade('${g}')">Grade ${g}</button>`
     ).join('');
+  renderUnitToggle();
+}
+
+function renderUnitToggle() {
+  const active = currentUnitType[currentGrade];
+  document.getElementById('unitTypeToggle').innerHTML = `
+    <div class="unit-type-toggle">
+      <button class="toggle-btn${active==='ela'?' active':''}" onclick="switchUnitType('ela')">ELA</button>
+      <button class="toggle-btn${active==='hum'?' active':''}" onclick="switchUnitType('hum')">Humanities</button>
+    </div>`;
 }
 
 function renderSidebar() {
-  const map = getStdUnitMap();
+  /* Combined ELA + Humanities count, scaled to 12 total units */
+  const counts = getCombinedStdCountMap();
   let html = '';
   STRANDS.forEach(strand => {
     const { color } = STRAND_META[strand];
     const stds = STANDARDS[currentGrade][strand];
     html += `<div class="sb-strand-label" style="color:${color}">${strand}</div>`;
     stds.forEach(std => {
-      const n   = (map[std.id] || []).length;
-      const pct = (n / 6) * 100;
+      const n   = counts[std.id] || 0;
+      const pct = (n / 12) * 100;
       html += `
         <div class="cov-row">
           <span class="cov-code" style="color:${color}">${std.id}</span>
@@ -1562,7 +1695,8 @@ function renderSidebar() {
 }
 
 function renderPool() {
-  const map = getStdUnitMap();
+  /* Use the active unit type's assignments for pip display */
+  const map = getActiveStdUnitMap();
   let html = '';
   STRANDS.forEach(strand => {
     const { color } = STRAND_META[strand];
@@ -1592,9 +1726,10 @@ function renderPool() {
   });
 
   /* ── Genre Pool section ─────────────────────────────── */
+  const genreAsgn   = activeGenreAssignments();
   const genreUnitMap = {};
   for (let u = 1; u <= 6; u++) {
-    (genreAssignments[currentGrade][String(u)] || []).forEach(label => {
+    (genreAsgn[currentGrade][String(u)] || []).forEach(label => {
       if (!genreUnitMap[label]) genreUnitMap[label] = [];
       genreUnitMap[label].push(u);
     });
@@ -1625,9 +1760,10 @@ function renderPool() {
     </div>`;
 
   /* ── Performance Tasks section ───────────────────────── */
+  const perfAsgn   = activePerfAssignments();
   const perfUnitMap = {};
   for (let u = 1; u <= 6; u++) {
-    (performanceAssignments[currentGrade][String(u)] || []).forEach(label => {
+    (perfAsgn[currentGrade][String(u)] || []).forEach(label => {
       if (!perfUnitMap[label]) perfUnitMap[label] = [];
       perfUnitMap[label].push(u);
     });
@@ -1665,14 +1801,23 @@ function renderPool() {
 }
 
 function renderUnits() {
-  const lookup = buildLookup(currentGrade);
+  const lookup   = buildLookup(currentGrade);
+  const unitType = currentUnitType[currentGrade]; // 'ela' | 'hum'
+  const isHumanities = unitType === 'hum';
+  const asgn    = activeAssignments();
+  const genreA  = activeGenreAssignments();
+  const perfA   = activePerfAssignments();
+
   let html = '';
   for (let u = 1; u <= 6; u++) {
     const uKey       = String(u);
-    const stds       = assignments[currentGrade][uKey] || [];
-    const genreItems = genreAssignments[currentGrade][uKey] || [];
-    const perfItems  = performanceAssignments[currentGrade][uKey] || [];
+    const stds       = asgn[currentGrade][uKey] || [];
+    const genreItems = genreA[currentGrade][uKey] || [];
+    const perfItems  = perfA[currentGrade][uKey] || [];
     const totalItems = stds.length + genreItems.length + perfItems.length;
+
+    const titlePrefix = isHumanities ? 'Humanities ' : '';
+    const humChip     = isHumanities ? '<span class="hum-chip">H</span>' : '';
 
     const stdHtml = stds.map(sid => {
       const s = lookup[sid];
@@ -1709,14 +1854,15 @@ function renderUnits() {
       </div>`).join('');
 
     html += `
-      <div class="unit-col unit--${u}"
+      <div class="unit-col unit--${u}${isHumanities?' hum':''}"
            ondragover="onDragOver(event,this)"
            ondragleave="onDragLeave(event,this)"
            ondrop="onDrop(event,${u},this)"
-           ondblclick="openUnitDetail(${u},event)">
+           ondblclick="openUnitDetail(${u},event,'${unitType}')">
         <div class="unit-col-head">
           <div class="unit-badge">${u}</div>
-          <span class="unit-col-title">Unit ${u}</span>
+          ${humChip}
+          <span class="unit-col-title">${titlePrefix}Unit ${u}</span>
           <span class="unit-std-count">${stds.length} std${stds.length!==1?'s':''}</span>
           <span class="unit-open-hint" title="Double-click to open detail">&#8599;</span>
         </div>
@@ -1771,8 +1917,8 @@ function handleDescInput(sid, rowIndex, inputEl) {
 ===================================================== */
 function renderDetailSidebar() {
   const u        = String(detailUnit);
-  const unitStds = assignments[currentGrade][u] || [];
-  const unitData = (assessments[currentGrade] || {})[u] || {};
+  const unitStds = activeAssignments()[currentGrade][u] || [];
+  const unitData = (activeAssessments()[currentGrade] || {})[u] || {};
 
   // Collect every assessment row that has BOTH type and date
   const scheduled = [];
@@ -1817,10 +1963,10 @@ function renderDetailSidebar() {
 ===================================================== */
 function renderDetailView() {
   const u          = String(detailUnit);
-  const stds       = assignments[currentGrade][u] || [];
+  const stds       = activeAssignments()[currentGrade][u] || [];
   const lookup     = buildLookup(currentGrade);
-  const genreItems = genreAssignments[currentGrade][u] || [];
-  const perfItems  = performanceAssignments[currentGrade][u] || [];
+  const genreItems = activeGenreAssignments()[currentGrade][u] || [];
+  const perfItems  = activePerfAssignments()[currentGrade][u] || [];
   const el         = document.getElementById('detailContent');
 
   /* ── Always render EU / EQ at the top ───────────────── */
@@ -1886,7 +2032,7 @@ function renderDetailView() {
     if (genreItems.length > 0) {
       if (hasMultipleSections) bottomHtml += `<div class="pool-section-hdr">Genre Pool</div>`;
       bottomHtml += genreItems.map(label => {
-        const gd   = (genreDetails[currentGrade] || {})[u] || {};
+        const gd   = (activeGenreDetails()[currentGrade] || {})[u] || {};
         const text = (gd[label] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         const safeLabel = label.replace(/"/g, '&quot;');
         return `
@@ -1906,7 +2052,7 @@ function renderDetailView() {
     if (perfItems.length > 0) {
       if (hasMultipleSections) bottomHtml += `<div class="pool-section-hdr">Performance Tasks</div>`;
       bottomHtml += perfItems.map(label => {
-        const pd   = (performanceDetails[currentGrade] || {})[u] || {};
+        const pd   = (activePerfDetails()[currentGrade] || {})[u] || {};
         const text = (pd[label] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         const safeLabel = label.replace(/"/g, '&quot;');
         return `
