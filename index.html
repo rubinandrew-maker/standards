@@ -1545,10 +1545,10 @@ function openUnitDetail(unit, evt, unitType) {
   detailUnit     = unit;
   detailUnitType = unitType || currentUnitType[currentGrade];
   currentView    = 'unit';
-  const typeLabel = detailUnitType === 'hum' ? 'Humanities ' : '';
+  const typeLabel = detailUnitType === 'hum' ? 'Humanities ' : 'ELA ';
   document.getElementById('mainCtrl').style.display   = 'none';
   document.getElementById('detailCtrl').style.display  = 'flex';
-  document.getElementById('detailTitle').textContent   = `Grade ${currentGrade} — ${typeLabel}Unit ${unit}`;
+  document.getElementById('detailTitle').textContent   = `Grade ${currentGrade} — ${typeLabel}${unit}`;
   document.getElementById('mainView').style.display    = 'none';
   document.getElementById('detailView').style.display  = 'flex';
   renderDetailView();
@@ -1816,7 +1816,7 @@ function renderUnits() {
     const perfItems  = perfA[currentGrade][uKey] || [];
     const totalItems = stds.length + genreItems.length + perfItems.length;
 
-    const titlePrefix = isHumanities ? 'Humanities ' : '';
+    const titlePrefix = isHumanities ? 'Humanities ' : 'ELA ';
     const humChip     = isHumanities ? '<span class="hum-chip">H</span>' : '';
 
     const stdHtml = stds.map(sid => {
