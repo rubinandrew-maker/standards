@@ -513,6 +513,62 @@
     }
     .asmt-date:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
 
+    /* ── ENDURING UNDERSTANDINGS / ESSENTIAL QUESTIONS ─── */
+    .ud-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--border);
+      border-radius: 8px;
+      padding: 18px 20px 14px;
+      margin-bottom: 14px;
+      box-shadow: var(--shadow-sm);
+    }
+    .ud-card-hdr {
+      font-size: .70rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text-sec);
+      margin-bottom: 13px;
+    }
+    .ud-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 7px;
+    }
+    .ud-num {
+      font-size: .72rem;
+      font-weight: 600;
+      color: var(--text-light);
+      min-width: 20px;
+      text-align: right;
+      flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+    }
+    .ud-input {
+      flex: 1;
+      padding: 6px 9px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font: 400 .82rem 'Inter', sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+    .ud-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+    .ud-add-btn {
+      background: none;
+      border: none;
+      padding: 3px 0 0 29px; /* align with inputs (num min-width + gap) */
+      font: 500 .72rem 'Inter', sans-serif;
+      color: var(--text-light);
+      cursor: pointer;
+      display: block;
+      letter-spacing: .01em;
+      transition: color .14s;
+    }
+    .ud-add-btn:hover { color: var(--accent); }
+
     /* ── POOL TAGS (Genre / Performance) ────────────────── */
     .pool-tag {
       font-size: .56rem;
@@ -866,6 +922,7 @@ let genreAssignments       = makeDefaultPoolAssignments();
 let performanceAssignments = makeDefaultPoolAssignments();
 let genreDetails           = makeDefaultDetails();
 let performanceDetails     = makeDefaultDetails();
+let unitDetails            = makeDefaultUnitDetails();
 
 function makeDefaultAssignments() {
   const a = {};
@@ -901,6 +958,18 @@ function makeDefaultDetails() {
   ['6','7','8'].forEach(g => {
     a[g] = {};
     ['1','2','3','4','5','6'].forEach(u => { a[g][u] = {}; });
+  });
+  return a;
+}
+
+/* Default unit details: grade → unit → { eu: string[], eq: string[] }
+ * eu = Enduring Understandings lines, eq = Essential Questions lines.
+ * Array length encodes how many lines are visible (0 → show 1 default). */
+function makeDefaultUnitDetails() {
+  const a = {};
+  ['6','7','8'].forEach(g => {
+    a[g] = {};
+    ['1','2','3','4','5','6'].forEach(u => { a[g][u] = { eu: [], eq: [] }; });
   });
   return a;
 }
@@ -1074,6 +1143,39 @@ function decodeDetailMap(data) {
   return a;
 }
 
+/* Encode unitDetails: internal → Firestore */
+function encodeUnitDetails(ud) {
+  const result = {};
+  ['6','7','8'].forEach(g => {
+    result[g] = {};
+    ['1','2','3','4','5','6'].forEach(u => {
+      const d = (ud[g] || {})[u] || { eu: [], eq: [] };
+      result[g][u] = {
+        enduringUnderstandings: d.eu || [],
+        essentialQuestions:     d.eq || [],
+      };
+    });
+  });
+  return result;
+}
+
+/* Decode unitDetails: Firestore → internal */
+function decodeUnitDetails(data) {
+  const a = makeDefaultUnitDetails();
+  if (!data) return a;
+  ['6','7','8'].forEach(g => {
+    if (!data[g]) return;
+    ['1','2','3','4','5','6'].forEach(u => {
+      if (!data[g][u]) return;
+      a[g][u] = {
+        eu: Array.isArray(data[g][u].enduringUnderstandings) ? data[g][u].enduringUnderstandings : [],
+        eq: Array.isArray(data[g][u].essentialQuestions)     ? data[g][u].essentialQuestions     : [],
+      };
+    });
+  });
+  return a;
+}
+
 /* Encode unit assignments: internal → Firestore */
 function encodeUnits(asgn) {
   const units = {};
@@ -1165,6 +1267,7 @@ function startSync() {
       performanceAssignments = decodePoolAssignments(data.performanceAssignments);
       genreDetails           = decodeDetailMap(data.genreDetails);
       performanceDetails     = decodeDetailMap(data.performanceDetails);
+      unitDetails            = decodeUnitDetails(data.unitDetails);
       // Only auto-re-render the main view from snapshots;
       // in detail view we skip re-render to preserve input focus.
       if (currentView === 'main') render();
@@ -1185,6 +1288,7 @@ async function writeToFirestore() {
       performanceAssignments: encodePoolAssignments(performanceAssignments),
       genreDetails:           encodeDetailMap(genreDetails),
       performanceDetails:     encodeDetailMap(performanceDetails),
+      unitDetails:            encodeUnitDetails(unitDetails),
     });
   } catch (err) {
     console.error('Firestore write error:', err);
@@ -1243,6 +1347,88 @@ function updatePoolDetail(el) {
   if (!detailMap[currentGrade][unit]) detailMap[currentGrade][unit] = {};
   detailMap[currentGrade][unit][label] = el.value;
   writeToFirestore();
+}
+
+/* =====================================================
+   MUTATIONS — ENDURING UNDERSTANDINGS / ESSENTIAL QUESTIONS
+===================================================== */
+/*
+ * fieldKey: 'eu' | 'eq'
+ * Called oninput — does NOT re-render (preserves input focus).
+ */
+function updateUnitDetailLine(fieldKey, index, value) {
+  const u  = String(detailUnit);
+  const ud = unitDetails[currentGrade][u];
+  // Extend array defensively in case length < index
+  while (ud[fieldKey].length <= index) ud[fieldKey].push('');
+  ud[fieldKey][index] = value;
+  writeToFirestore();
+}
+
+/*
+ * Called when the user clicks "+ Add another".
+ * Extends the array by 1 (making the new line visible) then re-renders
+ * only the top section — standard/genre/perf cards below are untouched.
+ */
+function revealNextLine(fieldKey) {
+  const u  = String(detailUnit);
+  const ud = unitDetails[currentGrade][u];
+  // visibleCount: 0-length array means 1 line is shown by default
+  const visible = ud[fieldKey].length === 0 ? 1 : ud[fieldKey].length;
+  if (visible >= MAX_LINES) return;
+  // Bring the array up to `visible` elements first (handles the 0-length case),
+  // then push one more empty string for the newly revealed line.
+  while (ud[fieldKey].length < visible) ud[fieldKey].push('');
+  ud[fieldKey].push('');
+  renderDetailTop();
+  writeToFirestore();
+}
+
+/* =====================================================
+   RENDER — EU / EQ TOP SECTION (partial re-render)
+===================================================== */
+const MAX_LINES = 5;
+
+function buildEuEqSection(fieldKey, sectionLabel, arr, u, accentColor) {
+  const visible = arr.length === 0 ? 1 : arr.length;
+  const rows = [];
+  for (let i = 0; i < visible; i++) {
+    const val         = (arr[i] || '').replace(/"/g, '&quot;');
+    const placeholder = fieldKey === 'eu'
+      ? 'Students will understand that…'
+      : 'How does…?';
+    rows.push(`
+      <div class="ud-row">
+        <span class="ud-num">${i + 1}.</span>
+        <input type="text" class="ud-input"
+               value="${val}"
+               placeholder="${placeholder}"
+               oninput="updateUnitDetailLine('${fieldKey}',${i},this.value)">
+      </div>`);
+  }
+  const addBtn = visible < MAX_LINES
+    ? `<button class="ud-add-btn" onclick="revealNextLine('${fieldKey}')">+ Add another</button>`
+    : '';
+  return `
+    <div class="ud-card" style="border-left-color:${accentColor}">
+      <div class="ud-card-hdr">${sectionLabel}</div>
+      ${rows.join('')}
+      ${addBtn}
+    </div>`;
+}
+
+function buildDetailTopHtml() {
+  const u  = String(detailUnit);
+  const ud = (unitDetails[currentGrade] || {})[u] || { eu: [], eq: [] };
+  return (
+    buildEuEqSection('eu', 'Enduring Understandings', ud.eu, u, '#E07B39') +
+    buildEuEqSection('eq', 'Essential Questions',     ud.eq, u, '#1D3557')
+  );
+}
+
+function renderDetailTop() {
+  const el = document.getElementById('detailTop');
+  if (el) el.innerHTML = buildDetailTopHtml();
 }
 
 /* =====================================================
@@ -1637,105 +1823,112 @@ function renderDetailView() {
   const perfItems  = performanceAssignments[currentGrade][u] || [];
   const el         = document.getElementById('detailContent');
 
+  /* ── Always render EU / EQ at the top ───────────────── */
+  const topHtml = buildDetailTopHtml();
+
+  /* ── Bottom: standards, genres, performance tasks ────── */
+  const hasMultipleSections = (stds.length > 0 ? 1 : 0) + (genreItems.length > 0 ? 1 : 0) + (perfItems.length > 0 ? 1 : 0) > 1;
+  let bottomHtml = '';
+
   if (stds.length === 0 && genreItems.length === 0 && perfItems.length === 0) {
-    el.innerHTML = `<div class="detail-empty">No content assigned to this unit yet.<br>
+    bottomHtml = `<div class="detail-empty" style="padding:40px 20px">No content assigned yet.<br>
       <span style="font-size:.8rem;color:var(--text-light);margin-top:6px;display:block">
         Go back to the planner and drag standards or content into Unit ${detailUnit}.
       </span></div>`;
-    renderDetailSidebar();
-    return;
-  }
+  } else {
+    /* ── Standards cards ─────────────────────────────────── */
+    if (stds.length > 0) {
+      if (hasMultipleSections) bottomHtml += `<div class="pool-section-hdr">Standards</div>`;
+      bottomHtml += stds.map(sid => {
+        const std = lookup[sid];
+        if (!std) return '';
+        const color = strandColor(sid);
+        const rows  = getAssessmentRows(currentGrade, detailUnit, sid);
 
-  const hasMultipleSections = (stds.length > 0 ? 1 : 0) + (genreItems.length > 0 ? 1 : 0) + (perfItems.length > 0 ? 1 : 0) > 1;
-  let html = '';
+        const asmtRows = [0, 1].map(i => {
+          const row  = rows[i] || { type:'', date:'', description:'' };
+          const desc = row.description || '';
+          const wc   = wordCount(desc);
+          return `
+            <div class="asmt-row">
+              <div class="asmt-row-top">
+                <span class="asmt-label">Assessment ${i + 1}</span>
+                <select class="asmt-select"
+                        onchange="updateAssessment('${sid}',${i},'type',this.value)">
+                  <option value=""            ${row.type===''            ?'selected':''}>&#8212; select type &#8212;</option>
+                  <option value="Quiz"        ${row.type==='Quiz'        ?'selected':''}>Quiz</option>
+                  <option value="Writing Task"${row.type==='Writing Task'?'selected':''}>Writing Task</option>
+                  <option value="Project"     ${row.type==='Project'     ?'selected':''}>Project</option>
+                </select>
+                <input type="date" class="asmt-date" value="${row.date || ''}"
+                       onchange="updateAssessment('${sid}',${i},'date',this.value)">
+              </div>
+              <div class="asmt-row-bottom">
+                <input type="text" class="asmt-desc" placeholder="Brief description..."
+                       value="${desc.replace(/"/g, '&quot;')}"
+                       oninput="handleDescInput('${sid}',${i},this)">
+                <span class="asmt-word-count${wc >= MAX_WORDS ? ' at-limit' : ''}">${wc}/${MAX_WORDS}</span>
+              </div>
+            </div>`;
+        }).join('');
 
-  /* ── Standards cards ─────────────────────────────────── */
-  if (stds.length > 0) {
-    if (hasMultipleSections) html += `<div class="pool-section-hdr">Standards</div>`;
-    html += stds.map(sid => {
-      const std = lookup[sid];
-      if (!std) return '';
-      const color = strandColor(sid);
-      const rows  = getAssessmentRows(currentGrade, detailUnit, sid);
-
-      const asmtRows = [0, 1].map(i => {
-        const row  = rows[i] || { type:'', date:'', description:'' };
-        const desc = row.description || '';
-        const wc   = wordCount(desc);
         return `
-          <div class="asmt-row">
-            <div class="asmt-row-top">
-              <span class="asmt-label">Assessment ${i + 1}</span>
-              <select class="asmt-select"
-                      onchange="updateAssessment('${sid}',${i},'type',this.value)">
-                <option value=""            ${row.type===''            ?'selected':''}>&#8212; select type &#8212;</option>
-                <option value="Quiz"        ${row.type==='Quiz'        ?'selected':''}>Quiz</option>
-                <option value="Writing Task"${row.type==='Writing Task'?'selected':''}>Writing Task</option>
-                <option value="Project"     ${row.type==='Project'     ?'selected':''}>Project</option>
-              </select>
-              <input type="date" class="asmt-date" value="${row.date || ''}"
-                     onchange="updateAssessment('${sid}',${i},'date',this.value)">
-            </div>
-            <div class="asmt-row-bottom">
-              <input type="text" class="asmt-desc" placeholder="Brief description..."
-                     value="${desc.replace(/"/g, '&quot;')}"
-                     oninput="handleDescInput('${sid}',${i},this)">
-              <span class="asmt-word-count${wc >= MAX_WORDS ? ' at-limit' : ''}">${wc}/${MAX_WORDS}</span>
-            </div>
+          <div class="std-detail-card" style="border-left-color:${color}">
+            <div class="std-detail-code" style="color:${color}">${std.id}</div>
+            <div class="std-detail-desc">${std.desc}</div>
+            <hr class="asmt-divider">
+            <div class="asmt-rows">${asmtRows}</div>
           </div>`;
       }).join('');
+    }
 
-      return `
-        <div class="std-detail-card" style="border-left-color:${color}">
-          <div class="std-detail-code" style="color:${color}">${std.id}</div>
-          <div class="std-detail-desc">${std.desc}</div>
-          <hr class="asmt-divider">
-          <div class="asmt-rows">${asmtRows}</div>
-        </div>`;
-    }).join('');
+    /* ── Genre Pool cards ────────────────────────────────── */
+    if (genreItems.length > 0) {
+      if (hasMultipleSections) bottomHtml += `<div class="pool-section-hdr">Genre Pool</div>`;
+      bottomHtml += genreItems.map(label => {
+        const gd   = (genreDetails[currentGrade] || {})[u] || {};
+        const text = (gd[label] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const safeLabel = label.replace(/"/g, '&quot;');
+        return `
+          <div class="pool-detail-card" style="border-left-color:${GENRE_COLOR}">
+            <div class="pool-detail-label">
+              <span class="pool-tag genre-tag">Genre</span>
+              ${label}
+            </div>
+            <textarea class="pool-detail-textarea" placeholder="Notes, anchor texts, focus areas…"
+                      data-pool-type="genre" data-label="${safeLabel}" data-unit="${u}"
+                      oninput="updatePoolDetail(this)">${text}</textarea>
+          </div>`;
+      }).join('');
+    }
+
+    /* ── Performance Task cards ──────────────────────────── */
+    if (perfItems.length > 0) {
+      if (hasMultipleSections) bottomHtml += `<div class="pool-section-hdr">Performance Tasks</div>`;
+      bottomHtml += perfItems.map(label => {
+        const pd   = (performanceDetails[currentGrade] || {})[u] || {};
+        const text = (pd[label] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const safeLabel = label.replace(/"/g, '&quot;');
+        return `
+          <div class="pool-detail-card" style="border-left-color:${PERF_COLOR}">
+            <div class="pool-detail-label">
+              <span class="pool-tag perf-tag">Task</span>
+              ${label}
+            </div>
+            <textarea class="pool-detail-textarea" placeholder="Notes, rubric links, scaffolds…"
+                      data-pool-type="perf" data-label="${safeLabel}" data-unit="${u}"
+                      oninput="updatePoolDetail(this)">${text}</textarea>
+          </div>`;
+      }).join('');
+    }
   }
 
-  /* ── Genre Pool cards ────────────────────────────────── */
-  if (genreItems.length > 0) {
-    if (hasMultipleSections) html += `<div class="pool-section-hdr">Genre Pool</div>`;
-    html += genreItems.map(label => {
-      const gd   = (genreDetails[currentGrade] || {})[u] || {};
-      const text = (gd[label] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      const safeLabel = label.replace(/"/g, '&quot;');
-      return `
-        <div class="pool-detail-card" style="border-left-color:${GENRE_COLOR}">
-          <div class="pool-detail-label">
-            <span class="pool-tag genre-tag">Genre</span>
-            ${label}
-          </div>
-          <textarea class="pool-detail-textarea" placeholder="Notes, anchor texts, focus areas…"
-                    data-pool-type="genre" data-label="${safeLabel}" data-unit="${u}"
-                    oninput="updatePoolDetail(this)">${text}</textarea>
-        </div>`;
-    }).join('');
-  }
+  /* Wrap in two divs so renderDetailTop() can patch just the top without
+     disturbing assessment inputs and textareas below. */
+  el.innerHTML =
+    `<div id="detailTop">${topHtml}</div>` +
+    `<div id="detailBottom">${bottomHtml}</div>`;
 
-  /* ── Performance Task cards ──────────────────────────── */
-  if (perfItems.length > 0) {
-    if (hasMultipleSections) html += `<div class="pool-section-hdr">Performance Tasks</div>`;
-    html += perfItems.map(label => {
-      const pd   = (performanceDetails[currentGrade] || {})[u] || {};
-      const text = (pd[label] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      const safeLabel = label.replace(/"/g, '&quot;');
-      return `
-        <div class="pool-detail-card" style="border-left-color:${PERF_COLOR}">
-          <div class="pool-detail-label">
-            <span class="pool-tag perf-tag">Task</span>
-            ${label}
-          </div>
-          <textarea class="pool-detail-textarea" placeholder="Notes, rubric links, scaffolds…"
-                    data-pool-type="perf" data-label="${safeLabel}" data-unit="${u}"
-                    oninput="updatePoolDetail(this)">${text}</textarea>
-        </div>`;
-    }).join('');
-  }
-
-  el.innerHTML = html;
   renderDetailSidebar();
 }
 
