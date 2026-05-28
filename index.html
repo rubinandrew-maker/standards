@@ -513,6 +513,82 @@
     }
     .asmt-date:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
 
+    /* ── POOL TAGS (Genre / Performance) ────────────────── */
+    .pool-tag {
+      font-size: .56rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      padding: 2px 5px;
+      border-radius: 3px;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .genre-tag { background: #EDE9FE; color: #5B21B6; }
+    .perf-tag  { background: #DBEAFE; color: #1E40AF; }
+
+    /* Pool item card (in standards pool panel) */
+    .pool-item-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-left-width: 3px;
+      border-radius: 5px;
+      padding: 7px 9px;
+      margin-bottom: 4px;
+      cursor: grab;
+      transition: box-shadow .15s, transform .1s;
+    }
+    .pool-item-card:hover { box-shadow: var(--shadow-md); }
+    .pool-item-card.dragging { opacity: .4; transform: scale(.97); cursor: grabbing; }
+    .pool-item-top { display: flex; align-items: center; gap: 6px; }
+    .pool-item-label { font-size: .69rem; font-weight: 500; color: var(--text); flex: 1; line-height: 1.42; }
+
+    /* Pool item card in unit detail view */
+    .pool-detail-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-left-width: 4px;
+      border-radius: 8px;
+      padding: 18px 20px 16px;
+      margin-bottom: 14px;
+      box-shadow: var(--shadow-sm);
+    }
+    .pool-detail-label {
+      font-size: .88rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .pool-detail-textarea {
+      width: 100%;
+      min-height: 80px;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      font: 400 .82rem 'Inter', sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      resize: vertical;
+      line-height: 1.5;
+    }
+    .pool-detail-textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+
+    /* Section header inside unit detail view */
+    .pool-section-hdr {
+      font-size: .70rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text-sec);
+      padding: 16px 0 8px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 14px;
+    }
+    .pool-section-hdr:first-child { padding-top: 0; }
+
     /* Scrollbar */
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -563,7 +639,7 @@
   <div class="unit-area">
     <div class="unit-area-head">
       <div class="pane-head" style="padding:0;border:none"><h2>Unit Assignments</h2></div>
-      <span class="unit-area-hint">Drop standards into any unit &middot; Double-click a unit to view detail</span>
+      <span class="unit-area-hint">Drop standards or content into any unit &middot; Double-click a unit to view detail</span>
     </div>
     <div class="unit-grid" id="unitGrid"></div>
   </div>
@@ -617,6 +693,24 @@ const STRAND_META = {
 };
 
 const UNIT_COLORS = ['#C0392B','#B7770D','#1A8C4E','#2471A3','#7D3C98','#0E8C7A'];
+
+const GENRE_COLOR = '#7C3AED'; // violet
+const PERF_COLOR  = '#0369A1'; // dark blue
+const GENRE_ITEMS = [
+  'Realistic Fiction',
+  'Historical Fiction',
+  'Informational / Nonfiction',
+  'Poetry',
+  'Drama',
+  'Myths & Folklore',
+];
+const PERF_ITEMS = [
+  'Narrative Writing',
+  'Argumentative Writing',
+  'Research / Expository Writing',
+  'Multimedia Presentation',
+  'Literary Analysis Essay',
+];
 
 const STANDARDS = {
   '6': {
@@ -768,6 +862,11 @@ let detailUnit   = null;   // 1–6 when in unit detail view
 let assignments  = makeDefaultAssignments();
 let assessments  = makeDefaultAssessments();
 
+let genreAssignments       = makeDefaultPoolAssignments();
+let performanceAssignments = makeDefaultPoolAssignments();
+let genreDetails           = makeDefaultDetails();
+let performanceDetails     = makeDefaultDetails();
+
 function makeDefaultAssignments() {
   const a = {};
   ['6','7','8'].forEach(g => {
@@ -778,6 +877,26 @@ function makeDefaultAssignments() {
 }
 
 function makeDefaultAssessments() {
+  const a = {};
+  ['6','7','8'].forEach(g => {
+    a[g] = {};
+    ['1','2','3','4','5','6'].forEach(u => { a[g][u] = {}; });
+  });
+  return a;
+}
+
+/* Default pool-item assignments: grade → unit → [] of labels */
+function makeDefaultPoolAssignments() {
+  const a = {};
+  ['6','7','8'].forEach(g => {
+    a[g] = {};
+    ['1','2','3','4','5','6'].forEach(u => { a[g][u] = []; });
+  });
+  return a;
+}
+
+/* Default pool-item details: grade → unit → { label: text } */
+function makeDefaultDetails() {
   const a = {};
   ['6','7','8'].forEach(g => {
     a[g] = {};
@@ -891,6 +1010,70 @@ function weekKey(isoDate) {
 function encodeKey(id)  { return id.replace(/\./g, '_'); }
 function decodeKey(key) { return key.replace(/_/g, '.'); }
 
+/*
+ * Pool-item labels (e.g. "Informational / Nonfiction") may contain slashes,
+ * which are not allowed in Firestore field names. Encode as pipe for storage.
+ */
+function encodeDetailKey(label) { return label.replace(/\//g, '|'); }
+function decodeDetailKey(key)   { return key.replace(/\|/g, '/'); }
+
+/* Encode pool assignments: internal → Firestore */
+function encodePoolAssignments(pa) {
+  const result = {};
+  ['6','7','8'].forEach(g => {
+    result[g] = {};
+    ['1','2','3','4','5','6'].forEach(u => {
+      result[g][u] = (pa[g] || {})[u] || [];
+    });
+  });
+  return result;
+}
+
+/* Decode pool assignments: Firestore → internal */
+function decodePoolAssignments(data) {
+  const a = makeDefaultPoolAssignments();
+  if (!data) return a;
+  ['6','7','8'].forEach(g => {
+    if (!data[g]) return;
+    ['1','2','3','4','5','6'].forEach(u => {
+      if (Array.isArray(data[g][u])) a[g][u] = data[g][u];
+    });
+  });
+  return a;
+}
+
+/* Encode detail map: internal { label: text } → Firestore { encodedLabel: text } */
+function encodeDetailMap(dm) {
+  const result = {};
+  ['6','7','8'].forEach(g => {
+    result[g] = {};
+    ['1','2','3','4','5','6'].forEach(u => {
+      result[g][u] = {};
+      const unitData = (dm[g] || {})[u] || {};
+      Object.entries(unitData).forEach(([label, text]) => {
+        result[g][u][encodeDetailKey(label)] = text;
+      });
+    });
+  });
+  return result;
+}
+
+/* Decode detail map: Firestore → internal */
+function decodeDetailMap(data) {
+  const a = makeDefaultDetails();
+  if (!data) return a;
+  ['6','7','8'].forEach(g => {
+    if (!data[g]) return;
+    ['1','2','3','4','5','6'].forEach(u => {
+      if (!data[g][u]) return;
+      Object.entries(data[g][u]).forEach(([key, text]) => {
+        a[g][u][decodeDetailKey(key)] = text;
+      });
+    });
+  });
+  return a;
+}
+
 /* Encode unit assignments: internal → Firestore */
 function encodeUnits(asgn) {
   const units = {};
@@ -976,8 +1159,12 @@ function startSync() {
     snap => {
       setStatus('live');
       const data = snap.data() || {};
-      assignments = decodeUnits(data.units);
-      assessments = decodeAssessments(data.assessments);
+      assignments            = decodeUnits(data.units);
+      assessments            = decodeAssessments(data.assessments);
+      genreAssignments       = decodePoolAssignments(data.genreAssignments);
+      performanceAssignments = decodePoolAssignments(data.performanceAssignments);
+      genreDetails           = decodeDetailMap(data.genreDetails);
+      performanceDetails     = decodeDetailMap(data.performanceDetails);
       // Only auto-re-render the main view from snapshots;
       // in detail view we skip re-render to preserve input focus.
       if (currentView === 'main') render();
@@ -992,8 +1179,12 @@ function startSync() {
 async function writeToFirestore() {
   try {
     await docRef.set({
-      units:       encodeUnits(assignments),
-      assessments: encodeAssessments(assessments),
+      units:                  encodeUnits(assignments),
+      assessments:            encodeAssessments(assessments),
+      genreAssignments:       encodePoolAssignments(genreAssignments),
+      performanceAssignments: encodePoolAssignments(performanceAssignments),
+      genreDetails:           encodeDetailMap(genreDetails),
+      performanceDetails:     encodeDetailMap(performanceDetails),
     });
   } catch (err) {
     console.error('Firestore write error:', err);
@@ -1021,6 +1212,38 @@ function removeFromUnit(sid, unit) {
 }
 
 function switchGrade(g) { currentGrade = g; render(); }
+
+/* =====================================================
+   MUTATIONS — POOL ITEMS (Genre & Performance)
+===================================================== */
+function addPoolItem(poolType, label, unit) {
+  const pool = poolType === 'genre' ? genreAssignments : performanceAssignments;
+  const key  = String(unit);
+  if (!pool[currentGrade][key].includes(label)) {
+    pool[currentGrade][key].push(label);
+    render();
+    writeToFirestore();
+  }
+}
+
+/* Called via data attributes on the remove button to avoid inline-JS escaping issues */
+function removePoolItem(btn) {
+  const { poolType, label, unit } = btn.dataset;
+  const pool = poolType === 'genre' ? genreAssignments : performanceAssignments;
+  const key  = String(unit);
+  const arr  = pool[currentGrade][key];
+  const i    = arr.indexOf(label);
+  if (i > -1) { arr.splice(i, 1); render(); writeToFirestore(); }
+}
+
+/* Called oninput on pool detail textareas — saves without re-rendering to preserve focus */
+function updatePoolDetail(el) {
+  const { poolType, label, unit } = el.dataset;
+  const detailMap = poolType === 'genre' ? genreDetails : performanceDetails;
+  if (!detailMap[currentGrade][unit]) detailMap[currentGrade][unit] = {};
+  detailMap[currentGrade][unit][label] = el.value;
+  writeToFirestore();
+}
 
 /* =====================================================
    MUTATIONS — ASSESSMENTS
@@ -1084,7 +1307,8 @@ function buildLookup(grade) {
 let draggedId = null;
 
 function onDragStart(e) {
-  draggedId = e.currentTarget.dataset.stdId;
+  // pool-item-card uses data-drag-id; std-card uses data-std-id
+  draggedId = e.currentTarget.dataset.dragId || e.currentTarget.dataset.stdId;
   e.currentTarget.classList.add('dragging');
   e.dataTransfer.effectAllowed = 'copy';
   e.dataTransfer.setData('text/plain', draggedId);
@@ -1102,8 +1326,15 @@ function onDragLeave(e, el) {
 function onDrop(e, unit, el) {
   e.preventDefault();
   el.classList.remove('drag-over');
-  const sid = e.dataTransfer.getData('text/plain') || draggedId;
-  if (sid) addToUnit(sid, unit);
+  const payload = e.dataTransfer.getData('text/plain') || draggedId;
+  if (!payload) return;
+  if (payload.startsWith('genre::')) {
+    addPoolItem('genre', payload.slice(7), unit);
+  } else if (payload.startsWith('perf::')) {
+    addPoolItem('perf', payload.slice(6), unit);
+  } else {
+    addToUnit(payload, unit);
+  }
 }
 
 /* =====================================================
@@ -1174,8 +1405,74 @@ function renderPool() {
       </div>`;
   });
 
+  /* ── Genre Pool section ─────────────────────────────── */
+  const genreUnitMap = {};
+  for (let u = 1; u <= 6; u++) {
+    (genreAssignments[currentGrade][String(u)] || []).forEach(label => {
+      if (!genreUnitMap[label]) genreUnitMap[label] = [];
+      genreUnitMap[label].push(u);
+    });
+  }
+  const genreCards = GENRE_ITEMS.map(label => {
+    const units = genreUnitMap[label] || [];
+    const pips  = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
+    return `
+      <div class="pool-item-card" draggable="true" data-drag-id="genre::${label}"
+           style="border-left-color:${GENRE_COLOR}">
+        <div class="pool-item-top">
+          <span class="pool-tag genre-tag">Genre</span>
+          <span class="pool-item-label">${label}</span>
+        </div>
+        ${units.length ? `<div class="std-card-pips">${pips}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  html += `
+    <div class="strand-section">
+      <div class="strand-header" onclick="toggleStrand(this)">
+        <div class="strand-dot" style="background:${GENRE_COLOR}"></div>
+        <span class="strand-name" style="color:${GENRE_COLOR}">Genre Pool</span>
+        <span class="strand-count">${GENRE_ITEMS.length}</span>
+        <span class="strand-chevron">&#9662;</span>
+      </div>
+      <div class="strand-cards">${genreCards}</div>
+    </div>`;
+
+  /* ── Performance Tasks section ───────────────────────── */
+  const perfUnitMap = {};
+  for (let u = 1; u <= 6; u++) {
+    (performanceAssignments[currentGrade][String(u)] || []).forEach(label => {
+      if (!perfUnitMap[label]) perfUnitMap[label] = [];
+      perfUnitMap[label].push(u);
+    });
+  }
+  const perfCards = PERF_ITEMS.map(label => {
+    const units = perfUnitMap[label] || [];
+    const pips  = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
+    return `
+      <div class="pool-item-card" draggable="true" data-drag-id="perf::${label}"
+           style="border-left-color:${PERF_COLOR}">
+        <div class="pool-item-top">
+          <span class="pool-tag perf-tag">Task</span>
+          <span class="pool-item-label">${label}</span>
+        </div>
+        ${units.length ? `<div class="std-card-pips">${pips}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  html += `
+    <div class="strand-section">
+      <div class="strand-header" onclick="toggleStrand(this)">
+        <div class="strand-dot" style="background:${PERF_COLOR}"></div>
+        <span class="strand-name" style="color:${PERF_COLOR}">Performance Tasks</span>
+        <span class="strand-count">${PERF_ITEMS.length}</span>
+        <span class="strand-chevron">&#9662;</span>
+      </div>
+      <div class="strand-cards">${perfCards}</div>
+    </div>`;
+
   document.getElementById('poolBody').innerHTML = html;
-  document.querySelectorAll('.std-card').forEach(c => {
+  document.querySelectorAll('.std-card, .pool-item-card').forEach(c => {
     c.addEventListener('dragstart', onDragStart);
     c.addEventListener('dragend',   onDragEnd);
   });
@@ -1185,8 +1482,13 @@ function renderUnits() {
   const lookup = buildLookup(currentGrade);
   let html = '';
   for (let u = 1; u <= 6; u++) {
-    const stds  = assignments[currentGrade][String(u)] || [];
-    const items = stds.map(sid => {
+    const uKey       = String(u);
+    const stds       = assignments[currentGrade][uKey] || [];
+    const genreItems = genreAssignments[currentGrade][uKey] || [];
+    const perfItems  = performanceAssignments[currentGrade][uKey] || [];
+    const totalItems = stds.length + genreItems.length + perfItems.length;
+
+    const stdHtml = stds.map(sid => {
       const s = lookup[sid];
       if (!s) return '';
       return `
@@ -1197,6 +1499,28 @@ function renderUnits() {
           <button class="unit-std-remove" onclick="removeFromUnit('${sid}',${u})" title="Remove">&#215;</button>
         </div>`;
     }).join('');
+
+    const genreHtml = genreItems.map(label => `
+      <div class="unit-std-item">
+        <div class="unit-std-info">
+          <span class="pool-tag genre-tag">Genre</span>
+          <div class="unit-std-code" style="margin-top:3px">${label}</div>
+        </div>
+        <button class="unit-std-remove" title="Remove"
+                data-pool-type="genre" data-label="${label.replace(/"/g,'&quot;')}" data-unit="${u}"
+                onclick="removePoolItem(this)">&#215;</button>
+      </div>`).join('');
+
+    const perfHtml = perfItems.map(label => `
+      <div class="unit-std-item">
+        <div class="unit-std-info">
+          <span class="pool-tag perf-tag">Task</span>
+          <div class="unit-std-code" style="margin-top:3px">${label}</div>
+        </div>
+        <button class="unit-std-remove" title="Remove"
+                data-pool-type="perf" data-label="${label.replace(/"/g,'&quot;')}" data-unit="${u}"
+                onclick="removePoolItem(this)">&#215;</button>
+      </div>`).join('');
 
     html += `
       <div class="unit-col unit--${u}"
@@ -1211,7 +1535,7 @@ function renderUnits() {
           <span class="unit-open-hint" title="Double-click to open detail">&#8599;</span>
         </div>
         <div class="unit-drop-zone">
-          ${stds.length ? items : '<div class="unit-empty">Drop standards here</div>'}
+          ${totalItems ? (stdHtml + genreHtml + perfHtml) : '<div class="unit-empty">Drop content here</div>'}
         </div>
       </div>`;
   }
@@ -1306,61 +1630,112 @@ function renderDetailSidebar() {
    RENDER — UNIT DETAIL VIEW
 ===================================================== */
 function renderDetailView() {
-  const u      = String(detailUnit);
-  const stds   = assignments[currentGrade][u] || [];
-  const lookup = buildLookup(currentGrade);
-  const el     = document.getElementById('detailContent');
+  const u          = String(detailUnit);
+  const stds       = assignments[currentGrade][u] || [];
+  const lookup     = buildLookup(currentGrade);
+  const genreItems = genreAssignments[currentGrade][u] || [];
+  const perfItems  = performanceAssignments[currentGrade][u] || [];
+  const el         = document.getElementById('detailContent');
 
-  if (stds.length === 0) {
-    el.innerHTML = `<div class="detail-empty">No standards assigned to this unit yet.<br>
+  if (stds.length === 0 && genreItems.length === 0 && perfItems.length === 0) {
+    el.innerHTML = `<div class="detail-empty">No content assigned to this unit yet.<br>
       <span style="font-size:.8rem;color:var(--text-light);margin-top:6px;display:block">
-        Go back to the planner and drag standards into Unit ${detailUnit}.
+        Go back to the planner and drag standards or content into Unit ${detailUnit}.
       </span></div>`;
+    renderDetailSidebar();
     return;
   }
 
-  el.innerHTML = stds.map(sid => {
-    const std = lookup[sid];
-    if (!std) return '';
-    const color = strandColor(sid);
-    const rows  = getAssessmentRows(currentGrade, detailUnit, sid);
+  const hasMultipleSections = (stds.length > 0 ? 1 : 0) + (genreItems.length > 0 ? 1 : 0) + (perfItems.length > 0 ? 1 : 0) > 1;
+  let html = '';
 
-    const asmtRows = [0, 1].map(i => {
-      const row  = rows[i] || { type:'', date:'', description:'' };
-      const desc = row.description || '';
-      const wc   = wordCount(desc);
+  /* ── Standards cards ─────────────────────────────────── */
+  if (stds.length > 0) {
+    if (hasMultipleSections) html += `<div class="pool-section-hdr">Standards</div>`;
+    html += stds.map(sid => {
+      const std = lookup[sid];
+      if (!std) return '';
+      const color = strandColor(sid);
+      const rows  = getAssessmentRows(currentGrade, detailUnit, sid);
+
+      const asmtRows = [0, 1].map(i => {
+        const row  = rows[i] || { type:'', date:'', description:'' };
+        const desc = row.description || '';
+        const wc   = wordCount(desc);
+        return `
+          <div class="asmt-row">
+            <div class="asmt-row-top">
+              <span class="asmt-label">Assessment ${i + 1}</span>
+              <select class="asmt-select"
+                      onchange="updateAssessment('${sid}',${i},'type',this.value)">
+                <option value=""            ${row.type===''            ?'selected':''}>&#8212; select type &#8212;</option>
+                <option value="Quiz"        ${row.type==='Quiz'        ?'selected':''}>Quiz</option>
+                <option value="Writing Task"${row.type==='Writing Task'?'selected':''}>Writing Task</option>
+                <option value="Project"     ${row.type==='Project'     ?'selected':''}>Project</option>
+              </select>
+              <input type="date" class="asmt-date" value="${row.date || ''}"
+                     onchange="updateAssessment('${sid}',${i},'date',this.value)">
+            </div>
+            <div class="asmt-row-bottom">
+              <input type="text" class="asmt-desc" placeholder="Brief description..."
+                     value="${desc.replace(/"/g, '&quot;')}"
+                     oninput="handleDescInput('${sid}',${i},this)">
+              <span class="asmt-word-count${wc >= MAX_WORDS ? ' at-limit' : ''}">${wc}/${MAX_WORDS}</span>
+            </div>
+          </div>`;
+      }).join('');
+
       return `
-        <div class="asmt-row">
-          <div class="asmt-row-top">
-            <span class="asmt-label">Assessment ${i + 1}</span>
-            <select class="asmt-select"
-                    onchange="updateAssessment('${sid}',${i},'type',this.value)">
-              <option value=""            ${row.type===''            ?'selected':''}>&#8212; select type &#8212;</option>
-              <option value="Quiz"        ${row.type==='Quiz'        ?'selected':''}>Quiz</option>
-              <option value="Writing Task"${row.type==='Writing Task'?'selected':''}>Writing Task</option>
-              <option value="Project"     ${row.type==='Project'     ?'selected':''}>Project</option>
-            </select>
-            <input type="date" class="asmt-date" value="${row.date || ''}"
-                   onchange="updateAssessment('${sid}',${i},'date',this.value)">
-          </div>
-          <div class="asmt-row-bottom">
-            <input type="text" class="asmt-desc" placeholder="Brief description..."
-                   value="${desc.replace(/"/g, '&quot;')}"
-                   oninput="handleDescInput('${sid}',${i},this)">
-            <span class="asmt-word-count${wc >= MAX_WORDS ? ' at-limit' : ''}">${wc}/${MAX_WORDS}</span>
-          </div>
+        <div class="std-detail-card" style="border-left-color:${color}">
+          <div class="std-detail-code" style="color:${color}">${std.id}</div>
+          <div class="std-detail-desc">${std.desc}</div>
+          <hr class="asmt-divider">
+          <div class="asmt-rows">${asmtRows}</div>
         </div>`;
     }).join('');
+  }
 
-    return `
-      <div class="std-detail-card" style="border-left-color:${color}">
-        <div class="std-detail-code" style="color:${color}">${std.id}</div>
-        <div class="std-detail-desc">${std.desc}</div>
-        <hr class="asmt-divider">
-        <div class="asmt-rows">${asmtRows}</div>
-      </div>`;
-  }).join('');
+  /* ── Genre Pool cards ────────────────────────────────── */
+  if (genreItems.length > 0) {
+    if (hasMultipleSections) html += `<div class="pool-section-hdr">Genre Pool</div>`;
+    html += genreItems.map(label => {
+      const gd   = (genreDetails[currentGrade] || {})[u] || {};
+      const text = (gd[label] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const safeLabel = label.replace(/"/g, '&quot;');
+      return `
+        <div class="pool-detail-card" style="border-left-color:${GENRE_COLOR}">
+          <div class="pool-detail-label">
+            <span class="pool-tag genre-tag">Genre</span>
+            ${label}
+          </div>
+          <textarea class="pool-detail-textarea" placeholder="Notes, anchor texts, focus areas…"
+                    data-pool-type="genre" data-label="${safeLabel}" data-unit="${u}"
+                    oninput="updatePoolDetail(this)">${text}</textarea>
+        </div>`;
+    }).join('');
+  }
 
+  /* ── Performance Task cards ──────────────────────────── */
+  if (perfItems.length > 0) {
+    if (hasMultipleSections) html += `<div class="pool-section-hdr">Performance Tasks</div>`;
+    html += perfItems.map(label => {
+      const pd   = (performanceDetails[currentGrade] || {})[u] || {};
+      const text = (pd[label] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const safeLabel = label.replace(/"/g, '&quot;');
+      return `
+        <div class="pool-detail-card" style="border-left-color:${PERF_COLOR}">
+          <div class="pool-detail-label">
+            <span class="pool-tag perf-tag">Task</span>
+            ${label}
+          </div>
+          <textarea class="pool-detail-textarea" placeholder="Notes, rubric links, scaffolds…"
+                    data-pool-type="perf" data-label="${safeLabel}" data-unit="${u}"
+                    oninput="updatePoolDetail(this)">${text}</textarea>
+        </div>`;
+    }).join('');
+  }
+
+  el.innerHTML = html;
   renderDetailSidebar();
 }
 
