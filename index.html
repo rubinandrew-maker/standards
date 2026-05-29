@@ -616,6 +616,7 @@
     }
     .genre-tag { background: #EDE9FE; color: #5B21B6; }
     .perf-tag  { background: #DBEAFE; color: #1E40AF; }
+    .theme-tag { background: #DCFCE7; color: #166534; }
 
     /* Pool item card (in standards pool panel) */
     .pool-item-card {
@@ -787,6 +788,7 @@ const UNIT_COLORS = ['#C0392B','#B7770D','#1A8C4E','#2471A3','#7D3C98','#0E8C7A'
 
 const GENRE_COLOR = '#7C3AED'; // violet
 const PERF_COLOR  = '#0369A1'; // dark blue
+const THEME_COLOR = '#15803D'; // green
 const GENRE_ITEMS = [
   'Realistic Fiction',
   'Historical Fiction',
@@ -802,6 +804,20 @@ const PERF_ITEMS = [
   'Research / Expository Writing',
   'Multimedia Presentation',
   'Literary Analysis Essay',
+];
+const THEME_ITEMS = [
+  'Identity and Self-Discovery (Coming-of-Age)',
+  'Humans are Explorers and Innovators',
+  'Building Empathy and Understanding Multiple Perspectives',
+  'Movements of Resistance and Revolution',
+  'Human Migration and Survival',
+  'Resilience and Overcoming Adversity',
+  'Demanding Equity and Justice for People of Color',
+  'Demanding Equity and Justice for Women',
+  'Demanding Equity and Justice for the LGBTQ Community',
+  'Technology, Media and Truth',
+  'Relationships and Belonging',
+  'Standing Up for Yourself and Others',
 ];
 
 const STANDARDS = {
@@ -963,6 +979,8 @@ let genreAssignments       = makeDefaultPoolAssignments();
 let performanceAssignments = makeDefaultPoolAssignments();
 let genreDetails           = makeDefaultDetails();
 let performanceDetails     = makeDefaultDetails();
+let themeAssignments       = makeDefaultPoolAssignments();
+let themeDetails           = makeDefaultDetails();
 let unitDetails            = makeDefaultUnitDetails();
 
 /* ── Humanities data (parallel structures) ────────────── */
@@ -971,8 +989,10 @@ let humAssessments  = makeDefaultAssessments();
 
 let humGenreAssignments = makeDefaultPoolAssignments();
 let humPerfAssignments  = makeDefaultPoolAssignments();
+let humThemeAssignments = makeDefaultPoolAssignments();
 let humGenreDetails     = makeDefaultDetails();
 let humPerfDetails      = makeDefaultDetails();
+let humThemeDetails     = makeDefaultDetails();
 let humUnitDetails      = makeDefaultUnitDetails();
 
 function makeDefaultAssignments() {
@@ -1323,10 +1343,14 @@ function startSync() {
       /* Humanities */
       humAssignments      = decodeUnits(data.humanitiesUnits);
       humAssessments      = decodeAssessments(data.humanitiesAssessments);
-      humGenreAssignments = decodePoolAssignments(data.humanitiesGenreAssignments);
-      humPerfAssignments  = decodePoolAssignments(data.humanitiesPerfAssignments);
-      humGenreDetails     = decodeDetailMap(data.humanitiesGenreDetails);
-      humPerfDetails      = decodeDetailMap(data.humanitiesPerfDetails);
+      humGenreAssignments  = decodePoolAssignments(data.humanitiesGenreAssignments);
+      humPerfAssignments   = decodePoolAssignments(data.humanitiesPerfAssignments);
+      humThemeAssignments  = decodePoolAssignments(data.humanitiesThemeAssignments);
+      humGenreDetails      = decodeDetailMap(data.humanitiesGenreDetails);
+      humPerfDetails       = decodeDetailMap(data.humanitiesPerfDetails);
+      humThemeDetails      = decodeDetailMap(data.humanitiesThemeDetails);
+      themeAssignments     = decodePoolAssignments(data.themeAssignments);
+      themeDetails         = decodeDetailMap(data.themeDetails);
       humUnitDetails      = decodeUnitDetails(data.humanitiesUnitDetails);
       // Only auto-re-render the main view from snapshots;
       // in detail view we skip re-render to preserve input focus.
@@ -1354,8 +1378,12 @@ async function writeToFirestore() {
       humanitiesAssessments:       encodeAssessments(humAssessments),
       humanitiesGenreAssignments:  encodePoolAssignments(humGenreAssignments),
       humanitiesPerfAssignments:   encodePoolAssignments(humPerfAssignments),
+      humanitiesThemeAssignments:  encodePoolAssignments(humThemeAssignments),
       humanitiesGenreDetails:      encodeDetailMap(humGenreDetails),
       humanitiesPerfDetails:       encodeDetailMap(humPerfDetails),
+      humanitiesThemeDetails:      encodeDetailMap(humThemeDetails),
+      themeAssignments:            encodePoolAssignments(themeAssignments),
+      themeDetails:                encodeDetailMap(themeDetails),
       humanitiesUnitDetails:       encodeUnitDetails(humUnitDetails),
     });
   } catch (err) {
@@ -1379,8 +1407,10 @@ function activeAssignments()      { return isHum() ? humAssignments      : assig
 function activeAssessments()      { return isHum() ? humAssessments      : assessments; }
 function activeGenreAssignments() { return isHum() ? humGenreAssignments : genreAssignments; }
 function activePerfAssignments()  { return isHum() ? humPerfAssignments  : performanceAssignments; }
+function activeThemeAssignments() { return isHum() ? humThemeAssignments : themeAssignments; }
 function activeGenreDetails()     { return isHum() ? humGenreDetails     : genreDetails; }
 function activePerfDetails()      { return isHum() ? humPerfDetails      : performanceDetails; }
+function activeThemeDetails()     { return isHum() ? humThemeDetails     : themeDetails; }
 function activeUnitDetails()      { return isHum() ? humUnitDetails      : unitDetails; }
 
 /* Toggle between ELA and Humanities unit grids (per grade) */
@@ -1417,7 +1447,9 @@ function switchGrade(g) { currentGrade = g; render(); }
    MUTATIONS — POOL ITEMS (Genre & Performance)
 ===================================================== */
 function addPoolItem(poolType, label, unit) {
-  const pool = poolType === 'genre' ? activeGenreAssignments() : activePerfAssignments();
+  const pool = poolType === 'genre' ? activeGenreAssignments()
+             : poolType === 'theme' ? activeThemeAssignments()
+             : activePerfAssignments();
   const key  = String(unit);
   if (!pool[currentGrade][key].includes(label)) {
     pool[currentGrade][key].push(label);
@@ -1429,7 +1461,9 @@ function addPoolItem(poolType, label, unit) {
 /* Called via data attributes on the remove button to avoid inline-JS escaping issues */
 function removePoolItem(btn) {
   const { poolType, label, unit } = btn.dataset;
-  const pool = poolType === 'genre' ? activeGenreAssignments() : activePerfAssignments();
+  const pool = poolType === 'genre' ? activeGenreAssignments()
+             : poolType === 'theme' ? activeThemeAssignments()
+             : activePerfAssignments();
   const key  = String(unit);
   const arr  = pool[currentGrade][key];
   const i    = arr.indexOf(label);
@@ -1439,7 +1473,9 @@ function removePoolItem(btn) {
 /* Called oninput on pool detail textareas — saves without re-rendering to preserve focus */
 function updatePoolDetail(el) {
   const { poolType, label, unit } = el.dataset;
-  const detailMap = poolType === 'genre' ? activeGenreDetails() : activePerfDetails();
+  const detailMap = poolType === 'genre' ? activeGenreDetails()
+                  : poolType === 'theme' ? activeThemeDetails()
+                  : activePerfDetails();
   if (!detailMap[currentGrade][unit]) detailMap[currentGrade][unit] = {};
   detailMap[currentGrade][unit][label] = el.value;
   writeToFirestore();
@@ -1641,6 +1677,8 @@ function onDrop(e, unit, el) {
     addPoolItem('genre', payload.slice(7), unit);
   } else if (payload.startsWith('perf::')) {
     addPoolItem('perf', payload.slice(6), unit);
+  } else if (payload.startsWith('theme::')) {
+    addPoolItem('theme', payload.slice(7), unit);
   } else {
     addToUnit(payload, unit);
   }
@@ -1794,6 +1832,40 @@ function renderPool() {
       <div class="strand-cards">${perfCards}</div>
     </div>`;
 
+  /* ── Themes section ──────────────────────────────────── */
+  const themeAsgn   = activeThemeAssignments();
+  const themeUnitMap = {};
+  for (let u = 1; u <= 6; u++) {
+    (themeAsgn[currentGrade][String(u)] || []).forEach(label => {
+      if (!themeUnitMap[label]) themeUnitMap[label] = [];
+      themeUnitMap[label].push(u);
+    });
+  }
+  const themeCards = THEME_ITEMS.map(label => {
+    const units = themeUnitMap[label] || [];
+    const pips  = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
+    return `
+      <div class="pool-item-card" draggable="true" data-drag-id="theme::${label}"
+           style="border-left-color:${THEME_COLOR}">
+        <div class="pool-item-top">
+          <span class="pool-tag theme-tag">Theme</span>
+          <span class="pool-item-label">${label}</span>
+        </div>
+        ${units.length ? `<div class="std-card-pips">${pips}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  html += `
+    <div class="strand-section">
+      <div class="strand-header" onclick="toggleStrand(this)">
+        <div class="strand-dot" style="background:${THEME_COLOR}"></div>
+        <span class="strand-name" style="color:${THEME_COLOR}">Themes</span>
+        <span class="strand-count">${THEME_ITEMS.length}</span>
+        <span class="strand-chevron">&#9662;</span>
+      </div>
+      <div class="strand-cards">${themeCards}</div>
+    </div>`;
+
   document.getElementById('poolBody').innerHTML = html;
   document.querySelectorAll('.std-card, .pool-item-card').forEach(c => {
     c.addEventListener('dragstart', onDragStart);
@@ -1808,6 +1880,7 @@ function renderUnits() {
   const asgn    = activeAssignments();
   const genreA  = activeGenreAssignments();
   const perfA   = activePerfAssignments();
+  const themeA  = activeThemeAssignments();
 
   let html = '';
   for (let u = 1; u <= 6; u++) {
@@ -1815,7 +1888,8 @@ function renderUnits() {
     const stds       = asgn[currentGrade][uKey] || [];
     const genreItems = genreA[currentGrade][uKey] || [];
     const perfItems  = perfA[currentGrade][uKey] || [];
-    const totalItems = stds.length + genreItems.length + perfItems.length;
+    const themeItems = themeA[currentGrade][uKey] || [];
+    const totalItems = stds.length + genreItems.length + perfItems.length + themeItems.length;
 
     const titlePrefix = isHumanities ? 'Humanities ' : 'ELA ';
     const humChip     = isHumanities ? '<span class="hum-chip">H</span>' : '';
@@ -1854,6 +1928,17 @@ function renderUnits() {
                 onclick="removePoolItem(this)">&#215;</button>
       </div>`).join('');
 
+    const themeHtml = themeItems.map(label => `
+      <div class="unit-std-item">
+        <div class="unit-std-info">
+          <span class="pool-tag theme-tag">Theme</span>
+          <div class="unit-std-code" style="margin-top:3px">${label}</div>
+        </div>
+        <button class="unit-std-remove" title="Remove"
+                data-pool-type="theme" data-label="${label.replace(/"/g,'&quot;')}" data-unit="${u}"
+                onclick="removePoolItem(this)">&#215;</button>
+      </div>`).join('');
+
     html += `
       <div class="unit-col unit--${u}${isHumanities?' hum':''}"
            ondragover="onDragOver(event,this)"
@@ -1868,7 +1953,7 @@ function renderUnits() {
           <span class="unit-open-hint" title="Double-click to open detail">&#8599;</span>
         </div>
         <div class="unit-drop-zone">
-          ${totalItems ? (stdHtml + genreHtml + perfHtml) : '<div class="unit-empty">Drop content here</div>'}
+          ${totalItems ? (stdHtml + genreHtml + perfHtml + themeHtml) : '<div class="unit-empty">Drop content here</div>'}
         </div>
       </div>`;
   }
@@ -1968,16 +2053,17 @@ function renderDetailView() {
   const lookup     = buildLookup(currentGrade);
   const genreItems = activeGenreAssignments()[currentGrade][u] || [];
   const perfItems  = activePerfAssignments()[currentGrade][u] || [];
+  const themeItems = activeThemeAssignments()[currentGrade][u] || [];
   const el         = document.getElementById('detailContent');
 
   /* ── Always render EU / EQ at the top ───────────────── */
   const topHtml = buildDetailTopHtml();
 
   /* ── Bottom: standards, genres, performance tasks ────── */
-  const hasMultipleSections = (stds.length > 0 ? 1 : 0) + (genreItems.length > 0 ? 1 : 0) + (perfItems.length > 0 ? 1 : 0) > 1;
+  const hasMultipleSections = (stds.length > 0 ? 1 : 0) + (genreItems.length > 0 ? 1 : 0) + (perfItems.length > 0 ? 1 : 0) + (themeItems.length > 0 ? 1 : 0) > 1;
   let bottomHtml = '';
 
-  if (stds.length === 0 && genreItems.length === 0 && perfItems.length === 0) {
+  if (stds.length === 0 && genreItems.length === 0 && perfItems.length === 0 && themeItems.length === 0) {
     bottomHtml = `<div class="detail-empty" style="padding:40px 20px">No content assigned yet.<br>
       <span style="font-size:.8rem;color:var(--text-light);margin-top:6px;display:block">
         Go back to the planner and drag standards or content into Unit ${detailUnit}.
@@ -2064,6 +2150,26 @@ function renderDetailView() {
             </div>
             <textarea class="pool-detail-textarea" placeholder="Notes, rubric links, scaffolds…"
                       data-pool-type="perf" data-label="${safeLabel}" data-unit="${u}"
+                      oninput="updatePoolDetail(this)">${text}</textarea>
+          </div>`;
+      }).join('');
+    }
+
+    /* ── Theme cards ─────────────────────────────────────── */
+    if (themeItems.length > 0) {
+      if (hasMultipleSections) bottomHtml += `<div class="pool-section-hdr">Themes</div>`;
+      bottomHtml += themeItems.map(label => {
+        const td   = (activeThemeDetails()[currentGrade] || {})[u] || {};
+        const text = (td[label] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const safeLabel = label.replace(/"/g, '&quot;');
+        return `
+          <div class="pool-detail-card" style="border-left-color:${THEME_COLOR}">
+            <div class="pool-detail-label">
+              <span class="pool-tag theme-tag">Theme</span>
+              ${label}
+            </div>
+            <textarea class="pool-detail-textarea" placeholder="Notes, connections, essential questions…"
+                      data-pool-type="theme" data-label="${safeLabel}" data-unit="${u}"
                       oninput="updatePoolDetail(this)">${text}</textarea>
           </div>`;
       }).join('');
