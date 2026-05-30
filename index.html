@@ -547,6 +547,79 @@
     }
     .asmt-date:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
 
+    /* ── UNIT OVERVIEW ───────────────────────────────────── */
+    .overview-section {
+      margin-bottom: 24px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    /* Published state — clean, no box */
+    .overview-published { position: relative; }
+    .overview-text {
+      font-size: .98rem;
+      line-height: 1.75;
+      color: var(--text);
+    }
+    .overview-edit-btn {
+      position: absolute;
+      top: -2px; right: -2px;
+      background: none;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      color: var(--text-light);
+      cursor: pointer;
+      font: 500 .68rem 'Inter', sans-serif;
+      padding: 3px 7px;
+      opacity: 0;
+      transition: opacity .15s, background .12s, border-color .12s;
+    }
+    .overview-published:hover .overview-edit-btn {
+      opacity: 1;
+    }
+    .overview-edit-btn:hover {
+      background: #F0EDE8;
+      border-color: var(--border);
+      color: var(--text-sec);
+    }
+    /* Edit state */
+    .overview-editor-wrap { display: flex; flex-direction: column; gap: 9px; }
+    .overview-textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font: 400 .9rem 'Inter', sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      resize: vertical;
+      line-height: 1.65;
+    }
+    .overview-textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+    .overview-toolbar { display: flex; align-items: center; gap: 8px; }
+    .overview-bold-btn {
+      padding: 4px 11px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--bg-card);
+      font: 700 .82rem 'Inter', sans-serif;
+      cursor: pointer;
+      color: var(--text-sec);
+      transition: background .12s;
+    }
+    .overview-bold-btn:hover { background: #EDEAE5; }
+    .overview-publish-btn {
+      padding: 5px 16px;
+      background: var(--accent);
+      border: none;
+      border-radius: 4px;
+      color: #fff;
+      font: 600 .78rem 'Inter', sans-serif;
+      cursor: pointer;
+      transition: opacity .14s;
+    }
+    .overview-publish-btn:hover { opacity: .87; }
+
     /* ── ENDURING UNDERSTANDINGS / ESSENTIAL QUESTIONS ─── */
     .ud-card {
       background: var(--bg-card);
@@ -1040,7 +1113,7 @@ function makeDefaultUnitDetails() {
   const a = {};
   ['6','7','8'].forEach(g => {
     a[g] = {};
-    ['1','2','3','4','5','6'].forEach(u => { a[g][u] = { eu: [], eq: [] }; });
+    ['1','2','3','4','5','6'].forEach(u => { a[g][u] = { eu: [], eq: [], overview: '', overviewPublished: false }; });
   });
   return a;
 }
@@ -1221,10 +1294,12 @@ function encodeUnitDetails(ud) {
   ['6','7','8'].forEach(g => {
     result[g] = {};
     ['1','2','3','4','5','6'].forEach(u => {
-      const d = (ud[g] || {})[u] || { eu: [], eq: [] };
+      const d = (ud[g] || {})[u] || { eu: [], eq: [], overview: '', overviewPublished: false };
       result[g][u] = {
         enduringUnderstandings: d.eu || [],
         essentialQuestions:     d.eq || [],
+        overview:               d.overview || '',
+        overviewPublished:      !!d.overviewPublished,
       };
     });
   });
@@ -1240,8 +1315,10 @@ function decodeUnitDetails(data) {
     ['1','2','3','4','5','6'].forEach(u => {
       if (!data[g][u]) return;
       a[g][u] = {
-        eu: Array.isArray(data[g][u].enduringUnderstandings) ? data[g][u].enduringUnderstandings : [],
-        eq: Array.isArray(data[g][u].essentialQuestions)     ? data[g][u].essentialQuestions     : [],
+        eu:               Array.isArray(data[g][u].enduringUnderstandings) ? data[g][u].enduringUnderstandings : [],
+        eq:               Array.isArray(data[g][u].essentialQuestions)     ? data[g][u].essentialQuestions     : [],
+        overview:         typeof data[g][u].overview === 'string'          ? data[g][u].overview              : '',
+        overviewPublished: !!data[g][u].overviewPublished,
       };
     });
   });
@@ -1521,6 +1598,68 @@ function revealNextLine(fieldKey) {
 ===================================================== */
 const MAX_LINES = 5;
 
+function buildOverviewSection(ud) {
+  const overview  = ud.overview || '';
+  const published = ud.overviewPublished && overview.trim() !== '';
+  if (published) {
+    const safeHtml = overview
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br>')
+      .replace(/&lt;strong&gt;/g, '<strong>')
+      .replace(/&lt;\/strong&gt;/g, '</strong>');
+    return `
+      <div class="overview-section">
+        <div class="overview-published">
+          <div class="overview-text">${safeHtml}</div>
+          <button class="overview-edit-btn" onclick="editOverview()" title="Edit overview">&#9998; Edit</button>
+        </div>
+      </div>`;
+  } else {
+    const escaped = overview.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return `
+      <div class="overview-section">
+        <div class="overview-editor-wrap">
+          <textarea id="overviewEditor" class="overview-textarea"
+                    placeholder="Write a unit overview…">${escaped}</textarea>
+          <div class="overview-toolbar">
+            <button class="overview-bold-btn" onclick="boldOverview()"><strong>B</strong></button>
+            <button class="overview-publish-btn" onclick="publishOverview()">Publish</button>
+          </div>
+        </div>
+      </div>`;
+  }
+}
+
+function publishOverview() {
+  const ta = document.getElementById('overviewEditor');
+  if (!ta) return;
+  const text = ta.value;
+  const u    = String(detailUnit);
+  const ud   = activeUnitDetails()[currentGrade][u];
+  ud.overview          = text;
+  ud.overviewPublished = text.trim() !== '';
+  renderDetailTop();
+  writeToFirestore();
+}
+
+function editOverview() {
+  const u  = String(detailUnit);
+  const ud = activeUnitDetails()[currentGrade][u];
+  ud.overviewPublished = false;
+  renderDetailTop();
+}
+
+function boldOverview() {
+  const ta = document.getElementById('overviewEditor');
+  if (!ta) return;
+  const start = ta.selectionStart, end = ta.selectionEnd;
+  if (start === end) return;
+  const val = ta.value;
+  ta.value  = val.slice(0, start) + '<strong>' + val.slice(start, end) + '</strong>' + val.slice(end);
+  const cursor = start + 8 + (end - start) + 9;
+  ta.setSelectionRange(cursor, cursor);
+}
+
 function buildEuEqSection(fieldKey, sectionLabel, arr, u, accentColor) {
   const visible = arr.length === 0 ? 1 : arr.length;
   const rows = [];
@@ -1551,8 +1690,9 @@ function buildEuEqSection(fieldKey, sectionLabel, arr, u, accentColor) {
 
 function buildDetailTopHtml() {
   const u  = String(detailUnit);
-  const ud = (activeUnitDetails()[currentGrade] || {})[u] || { eu: [], eq: [] };
+  const ud = (activeUnitDetails()[currentGrade] || {})[u] || { eu: [], eq: [], overview: '', overviewPublished: false };
   return (
+    buildOverviewSection(ud) +
     buildEuEqSection('eu', 'Enduring Understandings', ud.eu, u, '#E07B39') +
     buildEuEqSection('eq', 'Essential Questions',     ud.eq, u, '#1D3557')
   );
