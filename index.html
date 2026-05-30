@@ -620,6 +620,52 @@
     }
     .overview-publish-btn:hover { opacity: .87; }
 
+    /* ── TEXTS SECTION ───────────────────────────────────── */
+    .texts-section { margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
+    .texts-section-hdr {
+      font: 600 .72rem 'Inter', sans-serif; letter-spacing: .06em;
+      text-transform: uppercase; color: var(--text-light); margin-bottom: 10px;
+    }
+    .texts-published { position: relative; }
+    .texts-edit-btn {
+      position: absolute; top: -2px; right: -2px;
+      background: none; border: 1px solid transparent; border-radius: 4px;
+      color: var(--text-light); cursor: pointer; font: 500 .68rem 'Inter', sans-serif;
+      padding: 3px 7px; opacity: 0; transition: opacity .15s, background .12s, border-color .12s;
+    }
+    .texts-published:hover .texts-edit-btn { opacity: 1; }
+    .texts-edit-btn:hover { background: #F0EDE8; border-color: var(--border); color: var(--text-sec); }
+    .texts-entry-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+    .texts-entry-link {
+      font-weight: 700; color: var(--text); text-decoration: none; font-size: .95rem;
+    }
+    .texts-entry-link:hover { text-decoration: underline; color: var(--accent); }
+    .texts-entry-plain { font-weight: 700; color: var(--text); font-size: .95rem; }
+    .texts-editor-wrap { display: flex; flex-direction: column; gap: 8px; }
+    .texts-row { display: flex; gap: 8px; align-items: center; }
+    .texts-input-title {
+      flex: 1; padding: 7px 10px; border: 1px solid var(--border); border-radius: 5px;
+      font: 400 .88rem 'Inter', sans-serif; color: var(--text); background: var(--bg);
+    }
+    .texts-input-url {
+      flex: 1.2; padding: 7px 10px; border: 1px solid var(--border); border-radius: 5px;
+      font: 400 .82rem 'Inter', sans-serif; color: var(--text-sec); background: var(--bg);
+    }
+    .texts-input-title:focus, .texts-input-url:focus {
+      outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent;
+    }
+    .texts-toolbar { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+    .texts-add-btn {
+      background: none; border: none; color: var(--accent);
+      font: 500 .82rem 'Inter', sans-serif; cursor: pointer; padding: 0;
+    }
+    .texts-add-btn:hover { text-decoration: underline; }
+    .texts-publish-btn {
+      padding: 5px 16px; background: var(--accent); border: none; border-radius: 4px;
+      color: #fff; font: 600 .78rem 'Inter', sans-serif; cursor: pointer; transition: opacity .14s;
+    }
+    .texts-publish-btn:hover { opacity: .87; }
+
     /* ── ENDURING UNDERSTANDINGS / ESSENTIAL QUESTIONS ─── */
     .ud-card {
       background: var(--bg-card);
@@ -1113,7 +1159,7 @@ function makeDefaultUnitDetails() {
   const a = {};
   ['6','7','8'].forEach(g => {
     a[g] = {};
-    ['1','2','3','4','5','6'].forEach(u => { a[g][u] = { eu: [], eq: [], overview: '', overviewPublished: false }; });
+    ['1','2','3','4','5','6'].forEach(u => { a[g][u] = { eu: [], eq: [], overview: '', overviewPublished: false, texts: [], textsPublished: false }; });
   });
   return a;
 }
@@ -1300,6 +1346,8 @@ function encodeUnitDetails(ud) {
         essentialQuestions:     d.eq || [],
         overview:               d.overview || '',
         overviewPublished:      !!d.overviewPublished,
+        texts:                  d.texts || [],
+        textsPublished:         !!d.textsPublished,
       };
     });
   });
@@ -1319,6 +1367,8 @@ function decodeUnitDetails(data) {
         eq:               Array.isArray(data[g][u].essentialQuestions)     ? data[g][u].essentialQuestions     : [],
         overview:         typeof data[g][u].overview === 'string'          ? data[g][u].overview              : '',
         overviewPublished: !!data[g][u].overviewPublished,
+        texts:            Array.isArray(data[g][u].texts) ? data[g][u].texts : [],
+        textsPublished:   !!data[g][u].textsPublished,
       };
     });
   });
@@ -1660,6 +1710,87 @@ function boldOverview() {
   ta.setSelectionRange(cursor, cursor);
 }
 
+function buildTextsSection(ud) {
+  const texts     = ud.texts || [];
+  const published = ud.textsPublished && texts.some(t => t.title && t.title.trim());
+  const hdr = `<div class="texts-section-hdr">Texts</div>`;
+  if (published) {
+    const items = texts.filter(t => t.title && t.title.trim()).map(t => {
+      const safeTitle = t.title.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      if (t.url && t.url.trim()) {
+        const safeUrl = t.url.replace(/"/g,'&quot;');
+        return `<li><a class="texts-entry-link" href="${safeUrl}" target="_blank" rel="noopener">${safeTitle}</a></li>`;
+      }
+      return `<li><span class="texts-entry-plain">${safeTitle}</span></li>`;
+    }).join('');
+    return `
+      <div class="texts-section">
+        ${hdr}
+        <div class="texts-published">
+          <ul class="texts-entry-list">${items}</ul>
+          <button class="texts-edit-btn" onclick="editTexts()" title="Edit texts">&#9998; Edit</button>
+        </div>
+      </div>`;
+  } else {
+    const entries = texts.length > 0 ? texts : [{ title: '', url: '' }];
+    const rows = entries.map((t, i) => {
+      const safeTitle = (t.title || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      const safeUrl   = (t.url   || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      return `
+        <div class="texts-row">
+          <input type="text" class="texts-input-title" placeholder="Title (e.g. Inside Out &amp; Back Again)"
+                 value="${safeTitle}" oninput="updateTextEntry(${i},'title',this.value)">
+          <input type="url"  class="texts-input-url"   placeholder="URL (optional)"
+                 value="${safeUrl}"   oninput="updateTextEntry(${i},'url',this.value)">
+        </div>`;
+    }).join('');
+    return `
+      <div class="texts-section">
+        ${hdr}
+        <div class="texts-editor-wrap">
+          ${rows}
+          <div class="texts-toolbar">
+            <button class="texts-add-btn" onclick="addTextEntry()">+ Add another</button>
+            <button class="texts-publish-btn" onclick="publishTexts()">Publish</button>
+          </div>
+        </div>
+      </div>`;
+  }
+}
+
+function addTextEntry() {
+  const u  = String(detailUnit);
+  const ud = activeUnitDetails()[currentGrade][u];
+  if (!ud.texts) ud.texts = [];
+  ud.texts.push({ title: '', url: '' });
+  renderDetailTop();
+  writeToFirestore();
+}
+
+function updateTextEntry(index, field, value) {
+  const u  = String(detailUnit);
+  const ud = activeUnitDetails()[currentGrade][u];
+  if (!ud.texts)        ud.texts = [];
+  if (!ud.texts[index]) ud.texts[index] = { title: '', url: '' };
+  ud.texts[index][field] = value;
+  writeToFirestore();
+}
+
+function publishTexts() {
+  const u  = String(detailUnit);
+  const ud = activeUnitDetails()[currentGrade][u];
+  ud.textsPublished = true;
+  renderDetailTop();
+  writeToFirestore();
+}
+
+function editTexts() {
+  const u  = String(detailUnit);
+  const ud = activeUnitDetails()[currentGrade][u];
+  ud.textsPublished = false;
+  renderDetailTop();
+}
+
 function buildEuEqSection(fieldKey, sectionLabel, arr, u, accentColor) {
   const visible = arr.length === 0 ? 1 : arr.length;
   const rows = [];
@@ -1690,11 +1821,12 @@ function buildEuEqSection(fieldKey, sectionLabel, arr, u, accentColor) {
 
 function buildDetailTopHtml() {
   const u  = String(detailUnit);
-  const ud = (activeUnitDetails()[currentGrade] || {})[u] || { eu: [], eq: [], overview: '', overviewPublished: false };
+  const ud = (activeUnitDetails()[currentGrade] || {})[u] || { eu: [], eq: [], overview: '', overviewPublished: false, texts: [], textsPublished: false };
   return (
     buildOverviewSection(ud) +
     buildEuEqSection('eu', 'Enduring Understandings', ud.eu, u, '#E07B39') +
-    buildEuEqSection('eq', 'Essential Questions',     ud.eq, u, '#1D3557')
+    buildEuEqSection('eq', 'Essential Questions',     ud.eq, u, '#1D3557') +
+    buildTextsSection(ud)
   );
 }
 
@@ -1920,7 +2052,7 @@ function renderPool() {
       <div class="pool-item-card" draggable="true" data-drag-id="genre::${label}"
            style="border-left-color:${GENRE_COLOR}">
         <div class="pool-item-top">
-          <span class="pool-tag genre-tag">Genre</span>
+          <span class="pool-tag genre-tag">Texts</span>
           <span class="pool-item-label">${label}</span>
         </div>
         ${units.length ? `<div class="std-card-pips">${pips}</div>` : ''}
@@ -1931,7 +2063,7 @@ function renderPool() {
     <div class="strand-section">
       <div class="strand-header" onclick="toggleStrand(this)">
         <div class="strand-dot" style="background:${GENRE_COLOR}"></div>
-        <span class="strand-name" style="color:${GENRE_COLOR}">Genre Pool</span>
+        <span class="strand-name" style="color:${GENRE_COLOR}">Texts</span>
         <span class="strand-count">${GENRE_ITEMS.length}</span>
         <span class="strand-chevron">&#9662;</span>
       </div>
@@ -2049,7 +2181,7 @@ function renderUnits() {
     const genreHtml = genreItems.map(label => `
       <div class="unit-std-item">
         <div class="unit-std-info">
-          <span class="pool-tag genre-tag">Genre</span>
+          <span class="pool-tag genre-tag">Texts</span>
           <div class="unit-std-code" style="margin-top:3px">${label}</div>
         </div>
         <button class="unit-std-remove" title="Remove"
@@ -2199,11 +2331,11 @@ function renderDetailView() {
   /* ── Always render EU / EQ at the top ───────────────── */
   const topHtml = buildDetailTopHtml();
 
-  /* ── Bottom: standards, genres, performance tasks ────── */
-  const hasMultipleSections = (stds.length > 0 ? 1 : 0) + (genreItems.length > 0 ? 1 : 0) + (perfItems.length > 0 ? 1 : 0) + (themeItems.length > 0 ? 1 : 0) > 1;
+  /* ── Bottom: standards, performance tasks, themes ────── */
+  const hasMultipleSections = (stds.length > 0 ? 1 : 0) + (perfItems.length > 0 ? 1 : 0) + (themeItems.length > 0 ? 1 : 0) > 1;
   let bottomHtml = '';
 
-  if (stds.length === 0 && genreItems.length === 0 && perfItems.length === 0 && themeItems.length === 0) {
+  if (stds.length === 0 && perfItems.length === 0 && themeItems.length === 0) {
     bottomHtml = `<div class="detail-empty" style="padding:40px 20px">No content assigned yet.<br>
       <span style="font-size:.8rem;color:var(--text-light);margin-top:6px;display:block">
         Go back to the planner and drag standards or content into Unit ${detailUnit}.
@@ -2251,26 +2383,6 @@ function renderDetailView() {
             <div class="std-detail-desc">${std.desc}</div>
             <hr class="asmt-divider">
             <div class="asmt-rows">${asmtRows}</div>
-          </div>`;
-      }).join('');
-    }
-
-    /* ── Genre Pool cards ────────────────────────────────── */
-    if (genreItems.length > 0) {
-      if (hasMultipleSections) bottomHtml += `<div class="pool-section-hdr">Genre Pool</div>`;
-      bottomHtml += genreItems.map(label => {
-        const gd   = (activeGenreDetails()[currentGrade] || {})[u] || {};
-        const text = (gd[label] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const safeLabel = label.replace(/"/g, '&quot;');
-        return `
-          <div class="pool-detail-card" style="border-left-color:${GENRE_COLOR}">
-            <div class="pool-detail-label">
-              <span class="pool-tag genre-tag">Genre</span>
-              ${label}
-            </div>
-            <textarea class="pool-detail-textarea" placeholder="Notes, anchor texts, focus areas…"
-                      data-pool-type="genre" data-label="${safeLabel}" data-unit="${u}"
-                      oninput="updatePoolDetail(this)">${text}</textarea>
           </div>`;
       }).join('');
     }
