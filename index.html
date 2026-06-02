@@ -348,7 +348,7 @@
     .unit--5 .unit-badge { background: var(--u5); }
     .unit--6 .unit-badge { background: var(--u6); }
 
-    /* ── ELA / HUMANITIES TOGGLE ─────────────────────────── */
+    /* ── ELA / HUMANITIES / SPANISH TOGGLE ──────────────── */
     .unit-type-toggle {
       display: flex;
       background: rgba(0,0,0,.07);
@@ -358,7 +358,7 @@
       flex-shrink: 0;
     }
     .toggle-btn {
-      padding: 3px 13px;
+      padding: 3px 10px;
       border: none;
       border-radius: 3px;
       background: transparent;
@@ -379,6 +379,15 @@
       font-size: .53rem; font-weight: 800; text-transform: uppercase;
       letter-spacing: .04em; padding: 1px 4px; border-radius: 3px;
       background: #DDD6FE; color: #5B21B6;
+      flex-shrink: 0; line-height: 1.5;
+    }
+
+    /* Spanish unit column — subtle header tint + "S" chip */
+    .unit-col.spa .unit-col-head { background: #FFF1F2; }
+    .spa-chip {
+      font-size: .53rem; font-weight: 800; text-transform: uppercase;
+      letter-spacing: .04em; padding: 1px 4px; border-radius: 3px;
+      background: #FECDD3; color: #BE123C;
       flex-shrink: 0; line-height: 1.5;
     }
 
@@ -1085,9 +1094,9 @@ const STANDARDS = {
 let currentGrade    = '6';
 let currentView     = 'main'; // 'main' | 'unit'
 let detailUnit      = null;   // 1–6 when in unit detail view
-let detailUnitType  = 'ela';  // 'ela' | 'hum' — set when opening unit detail
+let detailUnitType  = 'ela';  // 'ela' | 'hum' | 'spa' — set when opening unit detail
 
-/* Per-grade ELA / Humanities toggle state (not persisted; resets on page load) */
+/* Per-grade ELA / Humanities / Spanish toggle state (not persisted; resets on page load) */
 let currentUnitType = { '6': 'ela', '7': 'ela', '8': 'ela' };
 
 /* ── ELA data ──────────────────────────────────────────── */
@@ -1113,6 +1122,18 @@ let humGenreDetails     = makeDefaultDetails();
 let humPerfDetails      = makeDefaultDetails();
 let humThemeDetails     = makeDefaultDetails();
 let humUnitDetails      = makeDefaultUnitDetails();
+
+/* ── Spanish data (parallel structures) ───────────────── */
+let spAssignments  = makeDefaultAssignments();
+let spAssessments  = makeDefaultAssessments();
+
+let spGenreAssignments = makeDefaultPoolAssignments();
+let spPerfAssignments  = makeDefaultPoolAssignments();
+let spThemeAssignments = makeDefaultPoolAssignments();
+let spGenreDetails     = makeDefaultDetails();
+let spPerfDetails      = makeDefaultDetails();
+let spThemeDetails     = makeDefaultDetails();
+let spUnitDetails      = makeDefaultUnitDetails();
 
 function makeDefaultAssignments() {
   const a = {};
@@ -1479,6 +1500,16 @@ function startSync() {
       themeAssignments     = decodePoolAssignments(data.themeAssignments);
       themeDetails         = decodeDetailMap(data.themeDetails);
       humUnitDetails      = decodeUnitDetails(data.humanitiesUnitDetails);
+      /* Spanish */
+      spAssignments      = decodeUnits(data.spanishUnits);
+      spAssessments      = decodeAssessments(data.spanishAssessments);
+      spGenreAssignments  = decodePoolAssignments(data.spanishGenreAssignments);
+      spPerfAssignments   = decodePoolAssignments(data.spanishPerfAssignments);
+      spThemeAssignments  = decodePoolAssignments(data.spanishThemeAssignments);
+      spGenreDetails      = decodeDetailMap(data.spanishGenreDetails);
+      spPerfDetails       = decodeDetailMap(data.spanishPerfDetails);
+      spThemeDetails      = decodeDetailMap(data.spanishThemeDetails);
+      spUnitDetails       = decodeUnitDetails(data.spanishUnitDetails);
       // Only auto-re-render the main view from snapshots;
       // in detail view we skip re-render to preserve input focus.
       if (currentView === 'main') render();
@@ -1512,6 +1543,16 @@ async function writeToFirestore() {
       themeAssignments:            encodePoolAssignments(themeAssignments),
       themeDetails:                encodeDetailMap(themeDetails),
       humanitiesUnitDetails:       encodeUnitDetails(humUnitDetails),
+      /* Spanish */
+      spanishUnits:             encodeUnits(spAssignments),
+      spanishAssessments:       encodeAssessments(spAssessments),
+      spanishGenreAssignments:  encodePoolAssignments(spGenreAssignments),
+      spanishPerfAssignments:   encodePoolAssignments(spPerfAssignments),
+      spanishThemeAssignments:  encodePoolAssignments(spThemeAssignments),
+      spanishGenreDetails:      encodeDetailMap(spGenreDetails),
+      spanishPerfDetails:       encodeDetailMap(spPerfDetails),
+      spanishThemeDetails:      encodeDetailMap(spThemeDetails),
+      spanishUnitDetails:       encodeUnitDetails(spUnitDetails),
     });
   } catch (err) {
     console.error('Firestore write error:', err);
@@ -1521,24 +1562,51 @@ async function writeToFirestore() {
 
 /* =====================================================
    ACTIVE-CONTEXT HELPERS
-   Returns true when the current operation (main view or detail
-   view) is operating on the Humanities data set.
+   Returns the current unit type ('ela' | 'hum' | 'spa') for the
+   active context (detail view or main view).
 ===================================================== */
-function isHum() {
-  return currentView === 'unit'
-    ? detailUnitType === 'hum'
-    : currentUnitType[currentGrade] === 'hum';
+function activeType() {
+  return currentView === 'unit' ? detailUnitType : currentUnitType[currentGrade];
 }
+function isHum() { return activeType() === 'hum'; }
+function isSpa() { return activeType() === 'spa'; }
 
-function activeAssignments()      { return isHum() ? humAssignments      : assignments; }
-function activeAssessments()      { return isHum() ? humAssessments      : assessments; }
-function activeGenreAssignments() { return isHum() ? humGenreAssignments : genreAssignments; }
-function activePerfAssignments()  { return isHum() ? humPerfAssignments  : performanceAssignments; }
-function activeThemeAssignments() { return isHum() ? humThemeAssignments : themeAssignments; }
-function activeGenreDetails()     { return isHum() ? humGenreDetails     : genreDetails; }
-function activePerfDetails()      { return isHum() ? humPerfDetails      : performanceDetails; }
-function activeThemeDetails()     { return isHum() ? humThemeDetails     : themeDetails; }
-function activeUnitDetails()      { return isHum() ? humUnitDetails      : unitDetails; }
+function activeAssignments() {
+  const t = activeType();
+  return t === 'hum' ? humAssignments : t === 'spa' ? spAssignments : assignments;
+}
+function activeAssessments() {
+  const t = activeType();
+  return t === 'hum' ? humAssessments : t === 'spa' ? spAssessments : assessments;
+}
+function activeGenreAssignments() {
+  const t = activeType();
+  return t === 'hum' ? humGenreAssignments : t === 'spa' ? spGenreAssignments : genreAssignments;
+}
+function activePerfAssignments() {
+  const t = activeType();
+  return t === 'hum' ? humPerfAssignments : t === 'spa' ? spPerfAssignments : performanceAssignments;
+}
+function activeThemeAssignments() {
+  const t = activeType();
+  return t === 'hum' ? humThemeAssignments : t === 'spa' ? spThemeAssignments : themeAssignments;
+}
+function activeGenreDetails() {
+  const t = activeType();
+  return t === 'hum' ? humGenreDetails : t === 'spa' ? spGenreDetails : genreDetails;
+}
+function activePerfDetails() {
+  const t = activeType();
+  return t === 'hum' ? humPerfDetails : t === 'spa' ? spPerfDetails : performanceDetails;
+}
+function activeThemeDetails() {
+  const t = activeType();
+  return t === 'hum' ? humThemeDetails : t === 'spa' ? spThemeDetails : themeDetails;
+}
+function activeUnitDetails() {
+  const t = activeType();
+  return t === 'hum' ? humUnitDetails : t === 'spa' ? spUnitDetails : unitDetails;
+}
 
 /* Toggle between ELA and Humanities unit grids (per grade) */
 function switchUnitType(type) {
@@ -1854,7 +1922,7 @@ function openUnitDetail(unit, evt, unitType) {
   detailUnit     = unit;
   detailUnitType = unitType || currentUnitType[currentGrade];
   currentView    = 'unit';
-  const typeLabel = detailUnitType === 'hum' ? 'Humanities ' : 'ELA ';
+  const typeLabel = detailUnitType === 'hum' ? 'Humanities ' : detailUnitType === 'spa' ? 'Spanish ' : 'ELA ';
   document.getElementById('mainCtrl').style.display   = 'none';
   document.getElementById('detailCtrl').style.display  = 'flex';
   document.getElementById('detailTitle').textContent   = `Grade ${currentGrade} — ${typeLabel}${unit}`;
@@ -1893,18 +1961,15 @@ function getActiveStdUnitMap() {
 }
 
 /*
- * Combined ELA + Humanities unit map for the sidebar coverage counter.
- * Returns { sid: count } (integer, max 12 per grade).
+ * Combined ELA + Humanities + Spanish unit map for the sidebar coverage counter.
+ * Returns { sid: count } (integer, max 18 per grade).
  */
 function getCombinedStdCountMap() {
   const counts = {};
   for (let u = 1; u <= 6; u++) {
-    for (const sid of (assignments[currentGrade][String(u)] || [])) {
-      counts[sid] = (counts[sid] || 0) + 1;
-    }
-    for (const sid of (humAssignments[currentGrade][String(u)] || [])) {
-      counts[sid] = (counts[sid] || 0) + 1;
-    }
+    for (const sid of (assignments[currentGrade][String(u)] || []))    counts[sid] = (counts[sid] || 0) + 1;
+    for (const sid of (humAssignments[currentGrade][String(u)] || [])) counts[sid] = (counts[sid] || 0) + 1;
+    for (const sid of (spAssignments[currentGrade][String(u)] || []))  counts[sid] = (counts[sid] || 0) + 1;
   }
   return counts;
 }
@@ -1980,11 +2045,12 @@ function renderUnitToggle() {
     <div class="unit-type-toggle">
       <button class="toggle-btn${active==='ela'?' active':''}" onclick="switchUnitType('ela')">ELA</button>
       <button class="toggle-btn${active==='hum'?' active':''}" onclick="switchUnitType('hum')">Humanities</button>
+      <button class="toggle-btn${active==='spa'?' active':''}" onclick="switchUnitType('spa')">Spanish</button>
     </div>`;
 }
 
 function renderSidebar() {
-  /* Combined ELA + Humanities count, scaled to 12 total units */
+  /* Combined ELA + Humanities + Spanish count, scaled to 18 total units */
   const counts = getCombinedStdCountMap();
   let html = '';
   STRANDS.forEach(strand => {
@@ -1993,7 +2059,7 @@ function renderSidebar() {
     html += `<div class="sb-strand-label" style="color:${color}">${strand}</div>`;
     stds.forEach(std => {
       const n   = counts[std.id] || 0;
-      const pct = (n / 12) * 100;
+      const pct = (n / 18) * 100;
       html += `
         <div class="cov-row">
           <span class="cov-code" style="color:${color}">${std.id}</span>
@@ -2147,8 +2213,9 @@ function renderPool() {
 
 function renderUnits() {
   const lookup   = buildLookup(currentGrade);
-  const unitType = currentUnitType[currentGrade]; // 'ela' | 'hum'
+  const unitType = currentUnitType[currentGrade]; // 'ela' | 'hum' | 'spa'
   const isHumanities = unitType === 'hum';
+  const isSpanish    = unitType === 'spa';
   const asgn    = activeAssignments();
   const genreA  = activeGenreAssignments();
   const perfA   = activePerfAssignments();
@@ -2163,8 +2230,10 @@ function renderUnits() {
     const themeItems = themeA[currentGrade][uKey] || [];
     const totalItems = stds.length + genreItems.length + perfItems.length + themeItems.length;
 
-    const titlePrefix = isHumanities ? 'Humanities ' : 'ELA ';
-    const humChip     = isHumanities ? '<span class="hum-chip">H</span>' : '';
+    const titlePrefix = isHumanities ? 'Humanities ' : isSpanish ? 'Spanish ' : 'ELA ';
+    const chip        = isHumanities ? '<span class="hum-chip">H</span>'
+                      : isSpanish    ? '<span class="spa-chip">S</span>'
+                      : '';
 
     const stdHtml = stds.map(sid => {
       const s = lookup[sid];
@@ -2212,14 +2281,14 @@ function renderUnits() {
       </div>`).join('');
 
     html += `
-      <div class="unit-col unit--${u}${isHumanities?' hum':''}"
+      <div class="unit-col unit--${u}${isHumanities?' hum':''}${isSpanish?' spa':''}"
            ondragover="onDragOver(event,this)"
            ondragleave="onDragLeave(event,this)"
            ondrop="onDrop(event,${u},this)"
            ondblclick="openUnitDetail(${u},event,'${unitType}')">
         <div class="unit-col-head">
           <div class="unit-badge">${u}</div>
-          ${humChip}
+          ${chip}
           <span class="unit-col-title">${titlePrefix}Unit ${u}</span>
           <span class="unit-std-count">${stds.length} std${stds.length!==1?'s':''}</span>
           <span class="unit-open-hint" title="Double-click to open detail">&#8599;</span>
