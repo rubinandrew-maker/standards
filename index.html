@@ -629,6 +629,20 @@
     }
     .overview-publish-btn:hover { opacity: .87; }
 
+    /* ── THEMES AT TOP OF DETAIL SCREEN ─────────────────── */
+    .themes-top-section { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+    .themes-top-hdr {
+      font: 600 .72rem 'Inter', sans-serif; letter-spacing: .06em;
+      text-transform: uppercase; color: var(--text-light); margin-bottom: 8px;
+    }
+    .themes-top-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .themes-top-chip {
+      display: inline-flex; align-items: center;
+      padding: 4px 11px; border-radius: 99px;
+      background: #F0FDF4; border: 1px solid #BBF7D0;
+      font: 500 .82rem 'Inter', sans-serif; color: #15803D; line-height: 1.4;
+    }
+
     /* ── TEXTS SECTION ───────────────────────────────────── */
     .texts-section { margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
     .texts-section-hdr {
@@ -1975,10 +1989,24 @@ function buildEuEqSection(fieldKey, sectionLabel, arr, u, accentColor) {
     </div>`;
 }
 
+function buildThemesTopSection(themeItems) {
+  if (!themeItems || !themeItems.length) return '';
+  const chips = themeItems
+    .map(label => `<span class="themes-top-chip">${label.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>`)
+    .join('');
+  return `
+    <div class="themes-top-section">
+      <div class="themes-top-hdr">Themes</div>
+      <div class="themes-top-list">${chips}</div>
+    </div>`;
+}
+
 function buildDetailTopHtml() {
-  const u  = String(detailUnit);
-  const ud = (activeUnitDetails()[currentGrade] || {})[u] || { eu: [], eq: [], overview: '', overviewPublished: false, texts: [], textsPublished: false };
+  const u          = String(detailUnit);
+  const ud         = (activeUnitDetails()[currentGrade] || {})[u] || { eu: [], eq: [], overview: '', overviewPublished: false, texts: [], textsPublished: false };
+  const themeItems = activeThemeAssignments()[currentGrade][u] || [];
   return (
+    buildThemesTopSection(themeItems) +
     buildOverviewSection(ud) +
     buildEuEqSection('eu', 'Enduring Understandings', ud.eu, u, '#E07B39') +
     buildEuEqSection('eq', 'Essential Questions',     ud.eq, u, '#1D3557') +
@@ -2560,21 +2588,17 @@ function addPtCriterion(sid) {
 ===================================================== */
 function renderDetailView() {
   const u          = String(detailUnit);
-  const stds       = activeAssignments()[currentGrade][u] || [];
-  const lookup     = buildLookup(currentGrade);
-  const genreItems = activeGenreAssignments()[currentGrade][u] || [];
-  const perfItems  = activePerfAssignments()[currentGrade][u] || [];
-  const themeItems = activeThemeAssignments()[currentGrade][u] || [];
-  const el         = document.getElementById('detailContent');
+  const stds   = activeAssignments()[currentGrade][u] || [];
+  const lookup = buildLookup(currentGrade);
+  const el     = document.getElementById('detailContent');
 
-  /* ── Always render EU / EQ at the top ───────────────── */
+  /* ── Always render EU / EQ + Themes at the top ──────── */
   const topHtml = buildDetailTopHtml();
 
-  /* ── Bottom: standards, themes, + always-on PT section ─ */
-  const hasMultipleSections = (stds.length > 0 ? 1 : 0) + (themeItems.length > 0 ? 1 : 0) > 0;
+  /* ── Bottom: standards + always-on PT section ────────── */
   let bottomHtml = '';
 
-  if (stds.length === 0 && themeItems.length === 0) {
+  if (stds.length === 0) {
     bottomHtml = `<div class="detail-empty" style="padding:40px 20px">No content assigned yet.<br>
       <span style="font-size:.8rem;color:var(--text-light);margin-top:6px;display:block">
         Go back to the planner and drag standards or content into Unit ${detailUnit}.
@@ -2628,25 +2652,6 @@ function renderDetailView() {
       }).join('');
     }
 
-    /* ── Theme cards ─────────────────────────────────────── */
-    if (themeItems.length > 0) {
-      bottomHtml += `<div class="pool-section-hdr">Themes</div>`;
-      bottomHtml += themeItems.map(label => {
-        const td   = (activeThemeDetails()[currentGrade] || {})[u] || {};
-        const text = (td[label] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const safeLabel = label.replace(/"/g, '&quot;');
-        return `
-          <div class="pool-detail-card" style="border-left-color:${THEME_COLOR}">
-            <div class="pool-detail-label">
-              <span class="pool-tag theme-tag">Theme</span>
-              ${label}
-            </div>
-            <textarea class="pool-detail-textarea" placeholder="Notes, connections, essential questions…"
-                      data-pool-type="theme" data-label="${safeLabel}" data-unit="${u}"
-                      oninput="updatePoolDetail(this)">${text}</textarea>
-          </div>`;
-      }).join('');
-    }
   }
 
   /* Wrap in two divs so renderDetailTop() can patch just the top without
