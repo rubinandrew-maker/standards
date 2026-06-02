@@ -2429,10 +2429,12 @@ function renderDetailView() {
                 <span class="asmt-label">Assessment ${i + 1}</span>
                 <select class="asmt-select"
                         onchange="updateAssessment('${sid}',${i},'type',this.value)">
-                  <option value=""            ${row.type===''            ?'selected':''}>&#8212; select type &#8212;</option>
-                  <option value="Quiz"        ${row.type==='Quiz'        ?'selected':''}>Quiz</option>
-                  <option value="Writing Task"${row.type==='Writing Task'?'selected':''}>Writing Task</option>
-                  <option value="Project"     ${row.type==='Project'     ?'selected':''}>Project</option>
+                  <option value=""                 ${row.type===''                 ?'selected':''}>&#8212; select type &#8212;</option>
+                  <option value="Quiz"             ${row.type==='Quiz'             ?'selected':''}>Quiz</option>
+                  <option value="Writing Task"     ${row.type==='Writing Task'     ?'selected':''}>Writing Task</option>
+                  <option value="Project"          ${row.type==='Project'          ?'selected':''}>Project</option>
+                  <option value="Final Assessment" ${row.type==='Final Assessment' ?'selected':''}>Final Assessment</option>
+                  <option value="Performance Task" ${row.type==='Performance Task' ?'selected':''}>Performance Task</option>
                 </select>
                 <input type="date" class="asmt-date" value="${row.date || ''}"
                        onchange="updateAssessment('${sid}',${i},'date',this.value)">
