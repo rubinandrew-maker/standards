@@ -795,6 +795,36 @@
     }
     .pool-detail-textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
 
+    /* ── PERFORMANCE TASK CRITERIA CARDS ─────────────────── */
+    .pt-empty {
+      font-size: .85rem; color: var(--text-light); font-style: italic; padding: 6px 0 12px;
+    }
+    .pt-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-left: 3px solid var(--border); border-radius: 6px;
+      padding: 14px 16px; margin-bottom: 12px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .pt-card-code {
+      font: 700 .85rem 'Inter', sans-serif; letter-spacing: .03em;
+    }
+    .pt-criterion-row { display: flex; align-items: center; gap: 8px; }
+    .pt-criterion-num {
+      font: 500 .82rem 'Inter', sans-serif; color: var(--text-light);
+      flex-shrink: 0; width: 18px; text-align: right;
+    }
+    .pt-criterion-input {
+      flex: 1; padding: 6px 10px; border: 1px solid var(--border); border-radius: 5px;
+      font: 400 .88rem 'Inter', sans-serif; color: var(--text); background: var(--bg);
+    }
+    .pt-criterion-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+    .pt-add-btn {
+      background: none; border: none; color: var(--accent);
+      font: 500 .80rem 'Inter', sans-serif; cursor: pointer;
+      padding: 0; align-self: flex-start;
+    }
+    .pt-add-btn:hover { text-decoration: underline; }
+
     /* Section header inside unit detail view */
     .pool-section-hdr {
       font-size: .70rem;
@@ -1123,6 +1153,11 @@ let humPerfDetails      = makeDefaultDetails();
 let humThemeDetails     = makeDefaultDetails();
 let humUnitDetails      = makeDefaultUnitDetails();
 
+/* ── Performance Task criteria (parallel structures) ──── */
+let ptCriteria    = makeDefaultPtCriteria();
+let humPtCriteria = makeDefaultPtCriteria();
+let spPtCriteria  = makeDefaultPtCriteria();
+
 /* ── Spanish data (parallel structures) ───────────────── */
 let spAssignments  = makeDefaultAssignments();
 let spAssessments  = makeDefaultAssessments();
@@ -1165,6 +1200,16 @@ function makeDefaultPoolAssignments() {
 
 /* Default pool-item details: grade → unit → { label: text } */
 function makeDefaultDetails() {
+  const a = {};
+  ['6','7','8'].forEach(g => {
+    a[g] = {};
+    ['1','2','3','4','5','6'].forEach(u => { a[g][u] = {}; });
+  });
+  return a;
+}
+
+/* Default PT criteria: grade → unit → { sid: string[] } */
+function makeDefaultPtCriteria() {
   const a = {};
   ['6','7','8'].forEach(g => {
     a[g] = {};
@@ -1396,6 +1441,38 @@ function decodeUnitDetails(data) {
   return a;
 }
 
+/* Encode PT criteria: internal → Firestore (dot-encode sid keys) */
+function encodePtCriteria(ptc) {
+  const result = {};
+  ['6','7','8'].forEach(g => {
+    result[g] = {};
+    ['1','2','3','4','5','6'].forEach(u => {
+      result[g][u] = {};
+      const unitData = (ptc[g] || {})[u] || {};
+      Object.entries(unitData).forEach(([sid, arr]) => {
+        result[g][u][encodeKey(sid)] = Array.isArray(arr) ? arr : [];
+      });
+    });
+  });
+  return result;
+}
+
+/* Decode PT criteria: Firestore → internal */
+function decodePtCriteria(data) {
+  const a = makeDefaultPtCriteria();
+  if (!data) return a;
+  ['6','7','8'].forEach(g => {
+    if (!data[g]) return;
+    ['1','2','3','4','5','6'].forEach(u => {
+      if (!data[g][u]) return;
+      Object.entries(data[g][u]).forEach(([encodedSid, arr]) => {
+        a[g][u][decodeKey(encodedSid)] = Array.isArray(arr) ? arr : [];
+      });
+    });
+  });
+  return a;
+}
+
 /* Encode unit assignments: internal → Firestore */
 function encodeUnits(asgn) {
   const units = {};
@@ -1500,6 +1577,8 @@ function startSync() {
       themeAssignments     = decodePoolAssignments(data.themeAssignments);
       themeDetails         = decodeDetailMap(data.themeDetails);
       humUnitDetails      = decodeUnitDetails(data.humanitiesUnitDetails);
+      ptCriteria          = decodePtCriteria(data.performanceTaskCriteria);
+      humPtCriteria       = decodePtCriteria(data.humanitiesPtCriteria);
       /* Spanish */
       spAssignments      = decodeUnits(data.spanishUnits);
       spAssessments      = decodeAssessments(data.spanishAssessments);
@@ -1510,6 +1589,7 @@ function startSync() {
       spPerfDetails       = decodeDetailMap(data.spanishPerfDetails);
       spThemeDetails      = decodeDetailMap(data.spanishThemeDetails);
       spUnitDetails       = decodeUnitDetails(data.spanishUnitDetails);
+      spPtCriteria        = decodePtCriteria(data.spanishPtCriteria);
       // Only auto-re-render the main view from snapshots;
       // in detail view we skip re-render to preserve input focus.
       if (currentView === 'main') render();
@@ -1553,6 +1633,10 @@ async function writeToFirestore() {
       spanishPerfDetails:       encodeDetailMap(spPerfDetails),
       spanishThemeDetails:      encodeDetailMap(spThemeDetails),
       spanishUnitDetails:       encodeUnitDetails(spUnitDetails),
+      /* PT criteria */
+      performanceTaskCriteria: encodePtCriteria(ptCriteria),
+      humanitiesPtCriteria:    encodePtCriteria(humPtCriteria),
+      spanishPtCriteria:       encodePtCriteria(spPtCriteria),
     });
   } catch (err) {
     console.error('Firestore write error:', err);
@@ -1606,6 +1690,10 @@ function activeThemeDetails() {
 function activeUnitDetails() {
   const t = activeType();
   return t === 'hum' ? humUnitDetails : t === 'spa' ? spUnitDetails : unitDetails;
+}
+function activePtCriteria() {
+  const t = activeType();
+  return t === 'hum' ? humPtCriteria : t === 'spa' ? spPtCriteria : ptCriteria;
 }
 
 /* Toggle between ELA and Humanities unit grids (per grade) */
@@ -1909,6 +1997,15 @@ function renderDetailTop() {
 function updateAssessment(sid, rowIndex, field, value) {
   const rows = getAssessmentRows(currentGrade, detailUnit, sid);
   rows[rowIndex][field] = value;
+  if (field === 'type') {
+    // If this standard no longer has PT in any row, discard its criteria
+    const stillHasPT = rows.some(r => r.type === 'Performance Task');
+    if (!stillHasPT) {
+      const unitCrit = activePtCriteria()[currentGrade][String(detailUnit)];
+      if (unitCrit) delete unitCrit[sid];
+    }
+    renderPerfTaskSection();
+  }
   renderDetailSidebar(); // update timeline instantly without touching the inputs
   writeToFirestore();
 }
@@ -2386,6 +2483,79 @@ function renderDetailSidebar() {
 }
 
 /* =====================================================
+   PERFORMANCE TASK CRITERIA — build / render / mutate
+===================================================== */
+const MAX_CRITERIA = 5;
+
+function buildPerfTaskSection(u) {
+  const stds  = activeAssignments()[currentGrade][u] || [];
+  const asmts = activeAssessments();
+  const crit  = activePtCriteria()[currentGrade][u] || {};
+
+  // Standards that have "Performance Task" in at least one assessment row
+  const ptStds = stds.filter(sid => {
+    const unitAsmts = (asmts[currentGrade] || {})[u] || {};
+    const rows = unitAsmts[sid];
+    return Array.isArray(rows) && rows.some(r => r.type === 'Performance Task');
+  });
+
+  const header = `<div class="pool-section-hdr">Performance Tasks</div>`;
+
+  if (ptStds.length === 0) {
+    return `${header}<div class="pt-empty">No Performance Task assessments assigned yet</div>`;
+  }
+
+  const cards = ptStds.map(sid => {
+    const criteria = (crit[sid] && crit[sid].length > 0) ? crit[sid] : [''];
+    const rows = criteria.map((val, i) => {
+      const safeVal = val.replace(/"/g, '&quot;');
+      return `
+        <div class="pt-criterion-row">
+          <span class="pt-criterion-num">${i + 1}.</span>
+          <input type="text" class="pt-criterion-input"
+                 value="${safeVal}" placeholder="Mastery criterion…"
+                 oninput="updatePtCriterion('${sid}',${i},this.value)">
+        </div>`;
+    }).join('');
+    const addBtn = criteria.length < MAX_CRITERIA
+      ? `<button class="pt-add-btn" onclick="addPtCriterion('${sid}')">+ Add criterion</button>`
+      : '';
+    return `
+      <div class="pt-card" style="border-left-color:${PERF_COLOR}">
+        <div class="pt-card-code" style="color:${PERF_COLOR}">${sid}</div>
+        ${rows}
+        ${addBtn}
+      </div>`;
+  }).join('');
+
+  return `${header}${cards}`;
+}
+
+function renderPerfTaskSection() {
+  const el = document.getElementById('perfTaskSection');
+  if (el) el.innerHTML = buildPerfTaskSection(String(detailUnit));
+}
+
+function updatePtCriterion(sid, index, value) {
+  const u    = String(detailUnit);
+  const crit = activePtCriteria()[currentGrade][u];
+  if (!crit[sid]) crit[sid] = [''];
+  crit[sid][index] = value;
+  writeToFirestore();
+}
+
+function addPtCriterion(sid) {
+  const u    = String(detailUnit);
+  const crit = activePtCriteria()[currentGrade][u];
+  if (!crit[sid]) crit[sid] = [''];
+  if (crit[sid].length < MAX_CRITERIA) {
+    crit[sid].push('');
+    renderPerfTaskSection();
+    writeToFirestore();
+  }
+}
+
+/* =====================================================
    RENDER — UNIT DETAIL VIEW
 ===================================================== */
 function renderDetailView() {
@@ -2400,11 +2570,11 @@ function renderDetailView() {
   /* ── Always render EU / EQ at the top ───────────────── */
   const topHtml = buildDetailTopHtml();
 
-  /* ── Bottom: standards, performance tasks, themes ────── */
-  const hasMultipleSections = (stds.length > 0 ? 1 : 0) + (perfItems.length > 0 ? 1 : 0) + (themeItems.length > 0 ? 1 : 0) > 1;
+  /* ── Bottom: standards, themes, + always-on PT section ─ */
+  const hasMultipleSections = (stds.length > 0 ? 1 : 0) + (themeItems.length > 0 ? 1 : 0) > 0;
   let bottomHtml = '';
 
-  if (stds.length === 0 && perfItems.length === 0 && themeItems.length === 0) {
+  if (stds.length === 0 && themeItems.length === 0) {
     bottomHtml = `<div class="detail-empty" style="padding:40px 20px">No content assigned yet.<br>
       <span style="font-size:.8rem;color:var(--text-light);margin-top:6px;display:block">
         Go back to the planner and drag standards or content into Unit ${detailUnit}.
@@ -2412,7 +2582,7 @@ function renderDetailView() {
   } else {
     /* ── Standards cards ─────────────────────────────────── */
     if (stds.length > 0) {
-      if (hasMultipleSections) bottomHtml += `<div class="pool-section-hdr">Standards</div>`;
+      bottomHtml += `<div class="pool-section-hdr">Standards</div>`;
       bottomHtml += stds.map(sid => {
         const std = lookup[sid];
         if (!std) return '';
@@ -2458,29 +2628,9 @@ function renderDetailView() {
       }).join('');
     }
 
-    /* ── Performance Task cards ──────────────────────────── */
-    if (perfItems.length > 0) {
-      if (hasMultipleSections) bottomHtml += `<div class="pool-section-hdr">Performance Tasks</div>`;
-      bottomHtml += perfItems.map(label => {
-        const pd   = (activePerfDetails()[currentGrade] || {})[u] || {};
-        const text = (pd[label] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const safeLabel = label.replace(/"/g, '&quot;');
-        return `
-          <div class="pool-detail-card" style="border-left-color:${PERF_COLOR}">
-            <div class="pool-detail-label">
-              <span class="pool-tag perf-tag">Task</span>
-              ${label}
-            </div>
-            <textarea class="pool-detail-textarea" placeholder="Notes, rubric links, scaffolds…"
-                      data-pool-type="perf" data-label="${safeLabel}" data-unit="${u}"
-                      oninput="updatePoolDetail(this)">${text}</textarea>
-          </div>`;
-      }).join('');
-    }
-
     /* ── Theme cards ─────────────────────────────────────── */
     if (themeItems.length > 0) {
-      if (hasMultipleSections) bottomHtml += `<div class="pool-section-hdr">Themes</div>`;
+      bottomHtml += `<div class="pool-section-hdr">Themes</div>`;
       bottomHtml += themeItems.map(label => {
         const td   = (activeThemeDetails()[currentGrade] || {})[u] || {};
         const text = (td[label] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -2500,10 +2650,12 @@ function renderDetailView() {
   }
 
   /* Wrap in two divs so renderDetailTop() can patch just the top without
-     disturbing assessment inputs and textareas below. */
+     disturbing assessment inputs and textareas below.
+     #perfTaskSection lives inside detailBottom so it can be independently
+     re-rendered when assessment type dropdowns change. */
   el.innerHTML =
     `<div id="detailTop">${topHtml}</div>` +
-    `<div id="detailBottom">${bottomHtml}</div>`;
+    `<div id="detailBottom">${bottomHtml}<div id="perfTaskSection">${buildPerfTaskSection(u)}</div></div>`;
 
   renderDetailSidebar();
 }
