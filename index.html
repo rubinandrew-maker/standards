@@ -759,6 +759,7 @@
     .genre-tag { background: #EDE9FE; color: #5B21B6; }
     .perf-tag  { background: #DBEAFE; color: #1E40AF; }
     .theme-tag { background: #DCFCE7; color: #166534; }
+    .curr-tag  { background: #FEF3C7; color: #92400E; }
 
     /* Pool item card (in standards pool panel) */
     .pool-item-card {
@@ -1010,6 +1011,12 @@ const UNIT_COLORS = ['#C0392B','#B7770D','#1A8C4E','#2471A3','#7D3C98','#0E8C7A'
 const GENRE_COLOR = '#7C3AED'; // violet
 const PERF_COLOR  = '#0369A1'; // dark blue
 const THEME_COLOR = '#15803D'; // green
+const CURR_COLOR  = '#B45309'; // amber
+
+const CURR_ITEMS = [
+  'Amplify','Fishtank','Teacher Made','C3 Teachers',
+  'OER Project','Learning for Justice','Facing History','Novel',
+];
 const GENRE_ITEMS = [
   'Realistic Fiction',
   'Historical Fiction',
@@ -1202,6 +1209,8 @@ let genreDetails           = makeDefaultDetails();
 let performanceDetails     = makeDefaultDetails();
 let themeAssignments       = makeDefaultPoolAssignments();
 let themeDetails           = makeDefaultDetails();
+let curriculumAssignments  = makeDefaultPoolAssignments();
+let curriculumDetails      = makeDefaultDetails();
 let unitDetails            = makeDefaultUnitDetails();
 
 /* ── Humanities data (parallel structures) ────────────── */
@@ -1211,9 +1220,11 @@ let humAssessments  = makeDefaultAssessments();
 let humGenreAssignments = makeDefaultPoolAssignments();
 let humPerfAssignments  = makeDefaultPoolAssignments();
 let humThemeAssignments = makeDefaultPoolAssignments();
+let humCurrAssignments  = makeDefaultPoolAssignments();
 let humGenreDetails     = makeDefaultDetails();
 let humPerfDetails      = makeDefaultDetails();
 let humThemeDetails     = makeDefaultDetails();
+let humCurrDetails      = makeDefaultDetails();
 let humUnitDetails      = makeDefaultUnitDetails();
 
 /* ── Performance Task criteria (parallel structures) ──── */
@@ -1228,9 +1239,11 @@ let spAssessments  = makeDefaultAssessments();
 let spGenreAssignments = makeDefaultPoolAssignments();
 let spPerfAssignments  = makeDefaultPoolAssignments();
 let spThemeAssignments = makeDefaultPoolAssignments();
+let spCurrAssignments  = makeDefaultPoolAssignments();
 let spGenreDetails     = makeDefaultDetails();
 let spPerfDetails      = makeDefaultDetails();
 let spThemeDetails     = makeDefaultDetails();
+let spCurrDetails      = makeDefaultDetails();
 let spUnitDetails      = makeDefaultUnitDetails();
 
 function makeDefaultAssignments() {
@@ -1643,6 +1656,10 @@ function startSync() {
       humThemeDetails      = decodeDetailMap(data.humanitiesThemeDetails);
       themeAssignments     = decodePoolAssignments(data.themeAssignments);
       themeDetails         = decodeDetailMap(data.themeDetails);
+      curriculumAssignments = decodePoolAssignments(data.curriculumAssignments);
+      curriculumDetails     = decodeDetailMap(data.curriculumDetails);
+      humCurrAssignments    = decodePoolAssignments(data.humanitiesCurrAssignments);
+      humCurrDetails        = decodeDetailMap(data.humanitiesCurrDetails);
       humUnitDetails      = decodeUnitDetails(data.humanitiesUnitDetails);
       ptCriteria          = decodePtCriteria(data.performanceTaskCriteria);
       humPtCriteria       = decodePtCriteria(data.humanitiesPtCriteria);
@@ -1655,6 +1672,8 @@ function startSync() {
       spGenreDetails      = decodeDetailMap(data.spanishGenreDetails);
       spPerfDetails       = decodeDetailMap(data.spanishPerfDetails);
       spThemeDetails      = decodeDetailMap(data.spanishThemeDetails);
+      spCurrAssignments   = decodePoolAssignments(data.spanishCurrAssignments);
+      spCurrDetails       = decodeDetailMap(data.spanishCurrDetails);
       spUnitDetails       = decodeUnitDetails(data.spanishUnitDetails);
       spPtCriteria        = decodePtCriteria(data.spanishPtCriteria);
       // Only auto-re-render the main view from snapshots;
@@ -1689,6 +1708,10 @@ async function writeToFirestore() {
       humanitiesThemeDetails:      encodeDetailMap(humThemeDetails),
       themeAssignments:            encodePoolAssignments(themeAssignments),
       themeDetails:                encodeDetailMap(themeDetails),
+      curriculumAssignments:       encodePoolAssignments(curriculumAssignments),
+      curriculumDetails:           encodeDetailMap(curriculumDetails),
+      humanitiesCurrAssignments:   encodePoolAssignments(humCurrAssignments),
+      humanitiesCurrDetails:       encodeDetailMap(humCurrDetails),
       humanitiesUnitDetails:       encodeUnitDetails(humUnitDetails),
       /* Spanish */
       spanishUnits:             encodeUnits(spAssignments),
@@ -1699,6 +1722,8 @@ async function writeToFirestore() {
       spanishGenreDetails:      encodeDetailMap(spGenreDetails),
       spanishPerfDetails:       encodeDetailMap(spPerfDetails),
       spanishThemeDetails:      encodeDetailMap(spThemeDetails),
+      spanishCurrAssignments:   encodePoolAssignments(spCurrAssignments),
+      spanishCurrDetails:       encodeDetailMap(spCurrDetails),
       spanishUnitDetails:       encodeUnitDetails(spUnitDetails),
       /* PT criteria */
       performanceTaskCriteria: encodePtCriteria(ptCriteria),
@@ -1754,6 +1779,14 @@ function activeThemeDetails() {
   const t = activeType();
   return t === 'hum' ? humThemeDetails : t === 'spa' ? spThemeDetails : themeDetails;
 }
+function activeCurrAssignments() {
+  const t = activeType();
+  return t === 'hum' ? humCurrAssignments : t === 'spa' ? spCurrAssignments : curriculumAssignments;
+}
+function activeCurrDetails() {
+  const t = activeType();
+  return t === 'hum' ? humCurrDetails : t === 'spa' ? spCurrDetails : curriculumDetails;
+}
 function activeUnitDetails() {
   const t = activeType();
   return t === 'hum' ? humUnitDetails : t === 'spa' ? spUnitDetails : unitDetails;
@@ -1799,6 +1832,7 @@ function switchGrade(g) { currentGrade = g; render(); }
 function addPoolItem(poolType, label, unit) {
   const pool = poolType === 'genre' ? activeGenreAssignments()
              : poolType === 'theme' ? activeThemeAssignments()
+             : poolType === 'curr'  ? activeCurrAssignments()
              : activePerfAssignments();
   const key  = String(unit);
   if (!pool[currentGrade][key].includes(label)) {
@@ -1813,6 +1847,7 @@ function removePoolItem(btn) {
   const { poolType, label, unit } = btn.dataset;
   const pool = poolType === 'genre' ? activeGenreAssignments()
              : poolType === 'theme' ? activeThemeAssignments()
+             : poolType === 'curr'  ? activeCurrAssignments()
              : activePerfAssignments();
   const key  = String(unit);
   const arr  = pool[currentGrade][key];
@@ -1825,6 +1860,7 @@ function updatePoolDetail(el) {
   const { poolType, label, unit } = el.dataset;
   const detailMap = poolType === 'genre' ? activeGenreDetails()
                   : poolType === 'theme' ? activeThemeDetails()
+                  : poolType === 'curr'  ? activeCurrDetails()
                   : activePerfDetails();
   if (!detailMap[currentGrade][unit]) detailMap[currentGrade][unit] = {};
   detailMap[currentGrade][unit][label] = el.value;
@@ -2280,6 +2316,8 @@ function onDrop(e, unit, el) {
     addPoolItem('perf', payload.slice(6), unit);
   } else if (payload.startsWith('theme::')) {
     addPoolItem('theme', payload.slice(7), unit);
+  } else if (payload.startsWith('curriculum::')) {
+    addPoolItem('curr', payload.slice(12), unit);
   } else {
     addToUnit(payload, unit);
   }
@@ -2468,6 +2506,40 @@ function renderPool() {
       <div class="strand-cards">${themeCards}</div>
     </div>`;
 
+  /* ── Curriculum section ───────────────────────────────── */
+  const currAsgn   = activeCurrAssignments();
+  const currUnitMap = {};
+  for (let u = 1; u <= 6; u++) {
+    (currAsgn[currentGrade][String(u)] || []).forEach(label => {
+      if (!currUnitMap[label]) currUnitMap[label] = [];
+      currUnitMap[label].push(u);
+    });
+  }
+  const currCards = CURR_ITEMS.map(label => {
+    const units = currUnitMap[label] || [];
+    const pips  = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
+    return `
+      <div class="pool-item-card" draggable="true" data-drag-id="curriculum::${label}"
+           style="border-left-color:${CURR_COLOR}">
+        <div class="pool-item-top">
+          <span class="pool-tag curr-tag">Curr</span>
+          <span class="pool-item-label">${label}</span>
+        </div>
+        ${units.length ? `<div class="std-card-pips">${pips}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  html += `
+    <div class="strand-section">
+      <div class="strand-header" onclick="toggleStrand(this)">
+        <div class="strand-dot" style="background:${CURR_COLOR}"></div>
+        <span class="strand-name" style="color:${CURR_COLOR}">Curriculum</span>
+        <span class="strand-count">${CURR_ITEMS.length}</span>
+        <span class="strand-chevron">&#9662;</span>
+      </div>
+      <div class="strand-cards">${currCards}</div>
+    </div>`;
+
   document.getElementById('poolBody').innerHTML = html;
   document.querySelectorAll('.std-card, .pool-item-card').forEach(c => {
     c.addEventListener('dragstart', onDragStart);
@@ -2484,6 +2556,7 @@ function renderUnits() {
   const genreA  = activeGenreAssignments();
   const perfA   = activePerfAssignments();
   const themeA  = activeThemeAssignments();
+  const currA   = activeCurrAssignments();
 
   let html = '';
   for (let u = 1; u <= 6; u++) {
@@ -2492,7 +2565,8 @@ function renderUnits() {
     const genreItems = genreA[currentGrade][uKey] || [];
     const perfItems  = perfA[currentGrade][uKey] || [];
     const themeItems = themeA[currentGrade][uKey] || [];
-    const totalItems = stds.length + genreItems.length + perfItems.length + themeItems.length;
+    const currItems  = currA[currentGrade][uKey]  || [];
+    const totalItems = stds.length + genreItems.length + perfItems.length + themeItems.length + currItems.length;
 
     const titlePrefix = isHumanities ? 'Humanities ' : isSpanish ? 'Spanish ' : 'ELA ';
     const chip        = isHumanities ? '<span class="hum-chip">H</span>'
@@ -2544,6 +2618,17 @@ function renderUnits() {
                 onclick="removePoolItem(this)">&#215;</button>
       </div>`).join('');
 
+    const currHtml = currItems.map(label => `
+      <div class="unit-std-item">
+        <div class="unit-std-info">
+          <span class="pool-tag curr-tag">Curr</span>
+          <div class="unit-std-code" style="margin-top:3px">${label}</div>
+        </div>
+        <button class="unit-std-remove" title="Remove"
+                data-pool-type="curr" data-label="${label.replace(/"/g,'&quot;')}" data-unit="${u}"
+                onclick="removePoolItem(this)">&#215;</button>
+      </div>`).join('');
+
     html += `
       <div class="unit-col unit--${u}${isHumanities?' hum':''}${isSpanish?' spa':''}"
            ondragover="onDragOver(event,this)"
@@ -2558,7 +2643,7 @@ function renderUnits() {
           <span class="unit-open-hint" title="Double-click to open detail">&#8599;</span>
         </div>
         <div class="unit-drop-zone">
-          ${totalItems ? (themeHtml + genreHtml + perfHtml + stdHtml) : '<div class="unit-empty">Drop content here</div>'}
+          ${totalItems ? (themeHtml + currHtml + genreHtml + perfHtml + stdHtml) : '<div class="unit-empty">Drop content here</div>'}
         </div>
       </div>`;
   }
@@ -2787,6 +2872,27 @@ function renderDetailView() {
             <div class="std-detail-desc">${std.desc}</div>
             <hr class="asmt-divider">
             <div class="asmt-rows">${asmtRows}</div>
+          </div>`;
+      }).join('');
+    }
+
+    /* ── Curriculum cards ────────────────────────────────── */
+    const currItems = activeCurrAssignments()[currentGrade][u] || [];
+    if (currItems.length > 0) {
+      bottomHtml += `<div class="pool-section-hdr">Curriculum</div>`;
+      bottomHtml += currItems.map(label => {
+        const cd   = (activeCurrDetails()[currentGrade] || {})[u] || {};
+        const text = (cd[label] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const safeLabel = label.replace(/"/g, '&quot;');
+        return `
+          <div class="pool-detail-card" style="border-left-color:${CURR_COLOR}">
+            <div class="pool-detail-label">
+              <span class="pool-tag curr-tag">Curr</span>
+              ${label}
+            </div>
+            <textarea class="pool-detail-textarea" placeholder="Notes, links, scaffolds…"
+                      data-pool-type="curr" data-label="${safeLabel}" data-unit="${u}"
+                      oninput="updatePoolDetail(this)">${text}</textarea>
           </div>`;
       }).join('');
     }
