@@ -1301,7 +1301,7 @@ function makeDefaultUnitDetails() {
   const a = {};
   ['6','7','8'].forEach(g => {
     a[g] = {};
-    ['1','2','3','4','5','6'].forEach(u => { a[g][u] = { eu: [], eq: [], overview: '', overviewPublished: false, texts: [], textsPublished: false, linkToSlides: '', linkToPlans: '' }; });
+    ['1','2','3','4','5','6'].forEach(u => { a[g][u] = { eu: [], eq: [], overview: '', overviewPublished: false, texts: [], textsPublished: false, linkToSlides: '', linkToPlans: '', curriculumLinks: {} }; });
   });
   return a;
 }
@@ -1492,6 +1492,7 @@ function encodeUnitDetails(ud) {
         textsPublished:         !!d.textsPublished,
         linkToSlides:           d.linkToSlides || '',
         linkToPlans:            d.linkToPlans  || '',
+        curriculumLinks:        (d.curriculumLinks && typeof d.curriculumLinks === 'object') ? d.curriculumLinks : {},
       };
     });
   });
@@ -1515,6 +1516,7 @@ function decodeUnitDetails(data) {
         textsPublished:   !!data[g][u].textsPublished,
         linkToSlides:     typeof data[g][u].linkToSlides === 'string' ? data[g][u].linkToSlides : '',
         linkToPlans:      typeof data[g][u].linkToPlans  === 'string' ? data[g][u].linkToPlans  : '',
+        curriculumLinks:  (data[g][u].curriculumLinks && typeof data[g][u].curriculumLinks === 'object') ? data[g][u].curriculumLinks : {},
       };
     });
   });
@@ -2159,6 +2161,93 @@ function attachLinkBoxClicks() {
       const hint   = box.querySelector('.unit-link-box-hint');
       if (editor) { editor.style.display = 'flex'; if (hint) hint.style.display = 'none'; }
       const inp = document.getElementById('linkInput-' + key);
+      if (inp) inp.focus();
+    });
+  });
+}
+
+/* ── Curriculum link boxes ─────────────────────────────── */
+function currLinkId(label) {
+  return 'clink-' + label.replace(/[^a-zA-Z0-9]/g, '_');
+}
+
+function buildCurriculumLinkBoxes(currItems, ud) {
+  if (!currItems || !currItems.length) return '';
+  const links = (ud && ud.curriculumLinks) ? ud.curriculumLinks : {};
+  const boxes = currItems.map(label => {
+    const url = links[label] || '';
+    const id  = currLinkId(label);
+    if (url) {
+      const safeUrl = url.replace(/"/g, '&quot;');
+      return `
+        <div class="unit-link-box has-link" onclick="window.open('${safeUrl}','_blank','noopener')"
+             title="Open ${label}">
+          <button class="unit-link-edit-btn"
+                  onclick="event.stopPropagation();editCurriculumLink('${label.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">&#9998;</button>
+          <span class="unit-link-box-label">${label}</span>
+          <span class="unit-link-box-hint">Click to open &#8599;</span>
+        </div>`;
+    } else {
+      return `
+        <div class="unit-link-box" id="box-${id}">
+          <span class="unit-link-box-label">${label}</span>
+          <span class="unit-link-box-hint">Add link</span>
+          <div class="unit-link-editor" style="display:none" id="editor-${id}">
+            <input type="url" class="unit-link-input" id="input-${id}"
+                   placeholder="Paste URL here…"
+                   onkeydown="if(event.key==='Enter')saveCurriculumLink('${label.replace(/'/g,"\\'")}')">
+            <button class="unit-link-save-btn"
+                    onclick="saveCurriculumLink('${label.replace(/'/g,"\\'")}')">Save</button>
+          </div>
+        </div>`;
+    }
+  }).join('');
+  return `<div class="pool-section-hdr">Curriculum</div><div class="unit-links-row">${boxes}</div>`;
+}
+
+function saveCurriculumLink(label) {
+  const id    = currLinkId(label);
+  const input = document.getElementById('input-' + id);
+  if (!input) return;
+  const url = input.value.trim();
+  if (!url) return;
+  const u  = String(detailUnit);
+  const ud = activeUnitDetails()[currentGrade][u];
+  if (!ud.curriculumLinks) ud.curriculumLinks = {};
+  ud.curriculumLinks[label] = url;
+  writeToFirestore();
+  renderCurrLinkSection();
+}
+
+function editCurriculumLink(label) {
+  const u  = String(detailUnit);
+  const ud = activeUnitDetails()[currentGrade][u];
+  if (!ud.curriculumLinks) ud.curriculumLinks = {};
+  delete ud.curriculumLinks[label];
+  writeToFirestore();
+  renderCurrLinkSection();
+}
+
+function renderCurrLinkSection() {
+  const el = document.getElementById('currLinkSection');
+  if (!el) return;
+  const u         = String(detailUnit);
+  const ud        = activeUnitDetails()[currentGrade][u] || {};
+  const currItems = activeCurrAssignments()[currentGrade][u] || [];
+  el.innerHTML    = buildCurriculumLinkBoxes(currItems, ud);
+  attachCurriculumLinkClicks(currItems);
+}
+
+function attachCurriculumLinkClicks(currItems) {
+  (currItems || []).forEach(label => {
+    const id  = currLinkId(label);
+    const box = document.getElementById('box-' + id);
+    if (!box) return;
+    box.addEventListener('click', () => {
+      const editor = document.getElementById('editor-' + id);
+      const hint   = box.querySelector('.unit-link-box-hint');
+      if (editor) { editor.style.display = 'flex'; if (hint) hint.style.display = 'none'; }
+      const inp = document.getElementById('input-' + id);
       if (inp) inp.focus();
     });
   });
@@ -2876,40 +2965,23 @@ function renderDetailView() {
       }).join('');
     }
 
-    /* ── Curriculum cards ────────────────────────────────── */
-    const currItems = activeCurrAssignments()[currentGrade][u] || [];
-    if (currItems.length > 0) {
-      bottomHtml += `<div class="pool-section-hdr">Curriculum</div>`;
-      bottomHtml += currItems.map(label => {
-        const cd   = (activeCurrDetails()[currentGrade] || {})[u] || {};
-        const text = (cd[label] || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const safeLabel = label.replace(/"/g, '&quot;');
-        return `
-          <div class="pool-detail-card" style="border-left-color:${CURR_COLOR}">
-            <div class="pool-detail-label">
-              <span class="pool-tag curr-tag">Curr</span>
-              ${label}
-            </div>
-            <textarea class="pool-detail-textarea" placeholder="Notes, links, scaffolds…"
-                      data-pool-type="curr" data-label="${safeLabel}" data-unit="${u}"
-                      oninput="updatePoolDetail(this)">${text}</textarea>
-          </div>`;
-      }).join('');
-    }
-
   }
 
   /* Wrap in two divs so renderDetailTop() can patch just the top without
      disturbing assessment inputs and textareas below.
      #perfTaskSection lives inside detailBottom so it can be independently
-     re-rendered when assessment type dropdowns change. */
-  const ud = activeUnitDetails()[currentGrade][u] || {};
+     re-rendered when assessment type dropdowns change.
+     #currLinkSection lives inside detailBottom so it can be independently
+     re-rendered when curriculum links are saved/edited. */
+  const ud        = activeUnitDetails()[currentGrade][u] || {};
+  const currItems = activeCurrAssignments()[currentGrade][u] || [];
   el.innerHTML =
     `<div id="detailTop">${topHtml}</div>` +
-    `<div id="detailBottom">${bottomHtml}<div id="perfTaskSection">${buildPerfTaskSection(u)}</div></div>` +
+    `<div id="detailBottom">${bottomHtml}<div id="perfTaskSection">${buildPerfTaskSection(u)}</div><div id="currLinkSection">${buildCurriculumLinkBoxes(currItems, ud)}</div></div>` +
     `<div id="unitLinksRow">${buildUnitLinksRow(ud)}</div>`;
 
   attachLinkBoxClicks();
+  attachCurriculumLinkClicks(currItems);
   renderDetailSidebar();
 }
 
