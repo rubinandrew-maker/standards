@@ -1667,6 +1667,7 @@ function encodeUnits(asgn) {
       const uNum = parseInt(u, 10);
       (asgn[grade][u] || []).forEach(sid => {
         const key = encodeKey(sid);
+        if (!units[grade][key]) units[grade][key] = []; // handle non-CCSS IDs (e.g. SJ standards)
         if (!units[grade][key].includes(uNum)) units[grade][key].push(uNum);
       });
     });
