@@ -760,6 +760,14 @@
     .perf-tag  { background: #DBEAFE; color: #1E40AF; }
     .theme-tag { background: #DCFCE7; color: #166534; }
     .curr-tag  { background: #FEF3C7; color: #92400E; }
+    .sj-tag    { background: #FCE7F3; color: #9D174D; }
+
+    /* Group label above SJ standards domain sections */
+    .pool-group-label {
+      font-size: .62rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .1em; color: var(--text-light);
+      padding: 14px 8px 4px; border-top: 1px solid var(--border); margin-top: 6px;
+    }
 
     /* Pool item card (in standards pool panel) */
     .pool-item-card {
@@ -1046,6 +1054,46 @@ const CURR_ITEMS = [
   'Amplify','Fishtank','Teacher Made','C3 Teachers',
   'OER Project','Learning for Justice','Facing History','Novel',
 ];
+
+const SJ_COLOR = '#BE185D'; // rose
+
+const SJ_DOMAINS = {
+  'Identity': [
+    { id: 'ID.1',  desc: 'Students will develop positive social identities based on their membership in multiple groups in society.' },
+    { id: 'ID.2',  desc: 'Students will develop language and historical and cultural knowledge that affirm and accurately describe their membership in multiple identity groups.' },
+    { id: 'ID.3',  desc: "Students will recognize that people's multiple identities interact and create unique and complex individuals." },
+    { id: 'ID.4',  desc: 'Students will express pride, confidence and healthy self-esteem without denying the value and dignity of other people.' },
+    { id: 'ID.5',  desc: 'Students will recognize traits of the dominant culture, their home culture and other cultures and understand how they negotiate their own identity in multiple spaces.' },
+  ],
+  'Diversity': [
+    { id: 'DI.6',  desc: 'Students will express comfort with people who are both similar to and different from them and engage respectfully with all people.' },
+    { id: 'DI.7',  desc: 'Students will develop language and knowledge to accurately and respectfully describe how people are both similar to and different from each other and others in their identity groups.' },
+    { id: 'DI.8',  desc: 'Students will respectfully express curiosity about the history and lived experiences of others and will exchange ideas and beliefs in an open-minded way.' },
+    { id: 'DI.9',  desc: 'Students will respond to diversity by building empathy, respect, understanding and connection.' },
+    { id: 'DI.10', desc: 'Students will examine diversity in social, cultural, political and historical contexts rather than in ways that are superficial or oversimplified.' },
+  ],
+  'Justice': [
+    { id: 'JU.11', desc: 'Students will recognize stereotypes and relate to people as individuals rather than representatives of groups.' },
+    { id: 'JU.12', desc: 'Students will recognize unfairness on the individual level and injustice at the institutional or systemic level.' },
+    { id: 'JU.13', desc: 'Students will analyze the harmful impact of bias and injustice on the world, historically and today.' },
+    { id: 'JU.14', desc: 'Students will recognize that power and privilege influence relationships on interpersonal, intergroup and institutional levels and consider how they have been affected by those dynamics.' },
+    { id: 'JU.15', desc: 'Students will identify figures, groups, events and a variety of strategies and philosophies relevant to the history of social justice around the world.' },
+  ],
+  'Action': [
+    { id: 'AC.16', desc: 'Students will express empathy when people are excluded or mistreated because of their identities and concern when they themselves experience bias.' },
+    { id: 'AC.17', desc: 'Students will recognize their own responsibility to stand up to exclusion, prejudice and injustice.' },
+    { id: 'AC.18', desc: 'Students will speak up with courage and respect when they or someone else has been hurt or wronged by bias.' },
+    { id: 'AC.19', desc: 'Students will make principled decisions about when and how to take a stand against bias and injustice in their everyday lives and will do so despite negative peer or group pressure.' },
+    { id: 'AC.20', desc: 'Students will plan and carry out collective action against bias and injustice in the world and will evaluate what strategies are most effective.' },
+  ],
+};
+
+// Flat lookup and ID set for SJ standards
+const SJ_LOOKUP = {};
+Object.values(SJ_DOMAINS).forEach(stds => stds.forEach(s => { SJ_LOOKUP[s.id] = s; }));
+const SJ_IDS = new Set(Object.keys(SJ_LOOKUP));
+function isSjStd(sid) { return SJ_IDS.has(sid) || (customItems && customItems.socialJustice.includes(sid)); }
+
 const GENRE_ITEMS = [
   'Realistic Fiction',
   'Historical Fiction',
@@ -1275,8 +1323,19 @@ let spThemeDetails     = makeDefaultDetails();
 let spCurrDetails      = makeDefaultDetails();
 let spUnitDetails      = makeDefaultUnitDetails();
 
+/* Social Justice Standards assignments / assessments / PT criteria */
+let sjAssignments    = makeDefaultAssignments();
+let sjAssessments    = makeDefaultAssessments();
+let sjPtCriteria     = makeDefaultPtCriteria();
+let humSjAssignments = makeDefaultAssignments();
+let humSjAssessments = makeDefaultAssessments();
+let humSjPtCriteria  = makeDefaultPtCriteria();
+let spSjAssignments  = makeDefaultAssignments();
+let spSjAssessments  = makeDefaultAssessments();
+let spSjPtCriteria   = makeDefaultPtCriteria();
+
 /* Custom items added by teachers to each pool */
-let customItems = { texts: [], performanceTasks: [], themes: [], curriculum: [] };
+let customItems = { texts: [], performanceTasks: [], themes: [], curriculum: [], socialJustice: [] };
 
 function makeDefaultAssignments() {
   const a = {};
@@ -1342,6 +1401,15 @@ function makeDefaultUnitDetails() {
 function getAssessmentRows(grade, unit, sid) {
   const u     = String(unit);
   const asmts = activeAssessments();
+  if (!asmts[grade][u])      asmts[grade][u] = {};
+  if (!asmts[grade][u][sid]) asmts[grade][u][sid] = [{ type:'', date:'', description:'' }, { type:'', date:'', description:'' }];
+  return asmts[grade][u][sid];
+}
+
+/* SJ parallel: uses activeSjAssessments() */
+function getSjAssessmentRows(grade, unit, sid) {
+  const u     = String(unit);
+  const asmts = activeSjAssessments();
   if (!asmts[grade][u])      asmts[grade][u] = {};
   if (!asmts[grade][u][sid]) asmts[grade][u][sid] = [{ type:'', date:'', description:'' }, { type:'', date:'', description:'' }];
   return asmts[grade][u][sid];
@@ -1710,6 +1778,16 @@ function startSync() {
       spCurrDetails       = decodeDetailMap(data.spanishCurrDetails);
       spUnitDetails       = decodeUnitDetails(data.spanishUnitDetails);
       spPtCriteria        = decodePtCriteria(data.spanishPtCriteria);
+      /* Social Justice Standards */
+      sjAssignments    = decodeUnits(data.sjUnits);
+      sjAssessments    = decodeAssessments(data.sjAssessments);
+      sjPtCriteria     = decodePtCriteria(data.sjPtCriteria);
+      humSjAssignments = decodeUnits(data.humanitiesSjUnits);
+      humSjAssessments = decodeAssessments(data.humanitiesSjAssessments);
+      humSjPtCriteria  = decodePtCriteria(data.humanitiesSjPtCriteria);
+      spSjAssignments  = decodeUnits(data.spanishSjUnits);
+      spSjAssessments  = decodeAssessments(data.spanishSjAssessments);
+      spSjPtCriteria   = decodePtCriteria(data.spanishSjPtCriteria);
       /* Custom pool items */
       const ci = data.customItems || {};
       customItems = {
@@ -1717,6 +1795,7 @@ function startSync() {
         performanceTasks: Array.isArray(ci.performanceTasks) ? ci.performanceTasks : [],
         themes:           Array.isArray(ci.themes)           ? ci.themes           : [],
         curriculum:       Array.isArray(ci.curriculum)       ? ci.curriculum       : [],
+        socialJustice:    Array.isArray(ci.socialJustice)    ? ci.socialJustice    : [],
       };
       // Only auto-re-render the main view from snapshots;
       // in detail view we skip re-render to preserve input focus.
@@ -1771,12 +1850,23 @@ async function writeToFirestore() {
       performanceTaskCriteria: encodePtCriteria(ptCriteria),
       humanitiesPtCriteria:    encodePtCriteria(humPtCriteria),
       spanishPtCriteria:       encodePtCriteria(spPtCriteria),
+      /* Social Justice Standards */
+      sjUnits:                encodeUnits(sjAssignments),
+      sjAssessments:          encodeAssessments(sjAssessments),
+      sjPtCriteria:           encodePtCriteria(sjPtCriteria),
+      humanitiesSjUnits:      encodeUnits(humSjAssignments),
+      humanitiesSjAssessments:encodeAssessments(humSjAssessments),
+      humanitiesSjPtCriteria: encodePtCriteria(humSjPtCriteria),
+      spanishSjUnits:         encodeUnits(spSjAssignments),
+      spanishSjAssessments:   encodeAssessments(spSjAssessments),
+      spanishSjPtCriteria:    encodePtCriteria(spSjPtCriteria),
       /* Custom pool items */
       customItems: {
         texts:            customItems.texts,
         performanceTasks: customItems.performanceTasks,
         themes:           customItems.themes,
         curriculum:       customItems.curriculum,
+        socialJustice:    customItems.socialJustice,
       },
     });
   } catch (err) {
@@ -1844,6 +1934,18 @@ function activePtCriteria() {
   const t = activeType();
   return t === 'hum' ? humPtCriteria : t === 'spa' ? spPtCriteria : ptCriteria;
 }
+function activeSjAssignments() {
+  const t = activeType();
+  return t === 'hum' ? humSjAssignments : t === 'spa' ? spSjAssignments : sjAssignments;
+}
+function activeSjAssessments() {
+  const t = activeType();
+  return t === 'hum' ? humSjAssessments : t === 'spa' ? spSjAssessments : sjAssessments;
+}
+function activeSjPtCriteria() {
+  const t = activeType();
+  return t === 'hum' ? humSjPtCriteria : t === 'spa' ? spSjPtCriteria : sjPtCriteria;
+}
 
 /* Toggle between ELA and Humanities unit grids (per grade) */
 function switchUnitType(type) {
@@ -1902,6 +2004,77 @@ function removePoolItem(btn) {
   const arr  = pool[currentGrade][key];
   const i    = arr.indexOf(label);
   if (i > -1) { arr.splice(i, 1); render(); writeToFirestore(); }
+}
+
+/* =====================================================
+   MUTATIONS — SOCIAL JUSTICE STANDARDS
+===================================================== */
+function addSjToUnit(sid, unit) {
+  const key  = String(unit);
+  const asgn = activeSjAssignments();
+  if (!asgn[currentGrade][key].includes(sid)) {
+    asgn[currentGrade][key].push(sid);
+    render();
+    writeToFirestore();
+  }
+}
+
+function removeSjFromUnit(sid, unit) {
+  const key  = String(unit);
+  const asgn = activeSjAssignments();
+  const arr  = asgn[currentGrade][key];
+  const i    = arr.indexOf(sid);
+  if (i > -1) { arr.splice(i, 1); render(); writeToFirestore(); }
+}
+
+function updateSjAssessment(sid, rowIndex, field, value) {
+  const rows = getSjAssessmentRows(currentGrade, detailUnit, sid);
+  rows[rowIndex][field] = value;
+  if (field === 'type') {
+    const stillHasPT = rows.some(r => r.type === 'Performance Task');
+    if (!stillHasPT) {
+      const unitCrit = activeSjPtCriteria()[currentGrade][String(detailUnit)];
+      if (unitCrit) delete unitCrit[sid];
+    }
+    renderPerfTaskSection();
+  }
+  renderDetailSidebar();
+  writeToFirestore();
+}
+
+function handleSjDescInput(sid, rowIndex, inputEl) {
+  let val   = inputEl.value;
+  let count = wordCount(val);
+  if (count > MAX_WORDS) {
+    val = val.trim().split(/\s+/).slice(0, MAX_WORDS).join(' ');
+    inputEl.value = val;
+    count = MAX_WORDS;
+  }
+  const counterEl = inputEl.nextElementSibling;
+  if (counterEl) {
+    counterEl.textContent = `${count}/${MAX_WORDS}`;
+    counterEl.className = 'asmt-word-count' + (count >= MAX_WORDS ? ' at-limit' : '');
+  }
+  updateSjAssessment(sid, rowIndex, 'description', val);
+}
+
+function updateSjPtCriterion(sid, index, value) {
+  const u    = String(detailUnit);
+  const crit = activeSjPtCriteria()[currentGrade][u];
+  if (!crit[sid]) crit[sid] = [''];
+  crit[sid][index] = value;
+  writeToFirestore();
+}
+
+function addSjPtCriterion(sid) {
+  const u    = String(detailUnit);
+  const crit = activeSjPtCriteria()[currentGrade][u];
+  if (!crit[sid]) crit[sid] = [''];
+  if (crit[sid].length < MAX_CRITERIA) {
+    crit[sid].push('');
+    renderPerfTaskSection();
+    writeToFirestore();
+  }
 }
 
 /* Called oninput on pool detail textareas — saves without re-rendering to preserve focus */
@@ -2454,6 +2627,8 @@ function onDrop(e, unit, el) {
     addPoolItem('theme', payload.slice(7), unit);
   } else if (payload.startsWith('curriculum::')) {
     addPoolItem('curr', payload.slice(12), unit);
+  } else if (payload.startsWith('sj::')) {
+    addSjToUnit(payload.slice(4), unit);
   } else {
     addToUnit(payload, unit);
   }
@@ -2716,6 +2891,74 @@ function renderPool() {
       </div>
     </div>`;
 
+  /* ── Social Justice Standards section ────────────────── */
+  const sjAsgn    = activeSjAssignments();
+  const sjUnitMap = {};
+  for (let u = 1; u <= 6; u++) {
+    (sjAsgn[currentGrade][String(u)] || []).forEach(sid => {
+      if (!sjUnitMap[sid]) sjUnitMap[sid] = [];
+      sjUnitMap[sid].push(u);
+    });
+  }
+
+  html += `<div class="pool-group-label">Social Justice Standards</div>`;
+
+  Object.entries(SJ_DOMAINS).forEach(([domain, stds]) => {
+    const domainCards = stds.map(std => {
+      const units = sjUnitMap[std.id] || [];
+      const pips  = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
+      return `
+        <div class="std-card" draggable="true" data-drag-id="sj::${std.id}"
+             style="border-left-color:${SJ_COLOR}" title="${std.desc}">
+          <div class="std-card-code" style="color:${SJ_COLOR}">${std.id}</div>
+          <div class="std-card-desc">${std.desc}</div>
+          ${units.length ? `<div class="std-card-pips">${pips}</div>` : ''}
+        </div>`;
+    }).join('');
+    html += `
+      <div class="strand-section">
+        <div class="strand-header" onclick="toggleStrand(this)">
+          <div class="strand-dot" style="background:${SJ_COLOR}"></div>
+          <span class="strand-name" style="color:${SJ_COLOR}">${domain}</span>
+          <span class="strand-count">${stds.length}</span>
+          <span class="strand-chevron">&#9662;</span>
+        </div>
+        <div class="strand-cards">${domainCards}</div>
+      </div>`;
+  });
+
+  // Custom SJ items + Add button (shown in a final Action-style section)
+  const sjCustomCards = customItems.socialJustice.map(sid => {
+    const units = sjUnitMap[sid] || [];
+    const pips  = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
+    return `
+      <div class="std-card" draggable="true" data-drag-id="sj::${sid}"
+           style="border-left-color:${SJ_COLOR}">
+        <div class="std-card-code" style="color:${SJ_COLOR}">${sid}</div>
+        ${units.length ? `<div class="std-card-pips">${pips}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  html += `
+    <div class="strand-section">
+      <div class="strand-header" onclick="toggleStrand(this)">
+        <div class="strand-dot" style="background:${SJ_COLOR}"></div>
+        <span class="strand-name" style="color:${SJ_COLOR}">Custom</span>
+        <span class="strand-count">${customItems.socialJustice.length}</span>
+        <span class="strand-chevron">&#9662;</span>
+      </div>
+      <div class="strand-cards">
+        ${sjCustomCards}
+        <button class="pool-add-btn" id="pool-add-btn-socialJustice" onclick="showPoolAddInput('socialJustice')">+ Add item</button>
+        <div class="pool-add-row" id="pool-add-row-socialJustice">
+          <input class="pool-add-input" id="pool-add-input-socialJustice" type="text" placeholder="Standard code…"
+                 onkeydown="if(event.key==='Enter')confirmPoolAdd('socialJustice');else if(event.key==='Escape')cancelPoolAdd('socialJustice')">
+          <button class="pool-add-confirm" onmousedown="event.preventDefault()" onclick="confirmPoolAdd('socialJustice')">Add</button>
+          <button class="pool-add-cancel" onmousedown="event.preventDefault()" onclick="cancelPoolAdd('socialJustice')">&#215;</button>
+        </div>
+      </div>
+    </div>`;
+
   document.getElementById('poolBody').innerHTML = html;
   document.querySelectorAll('.std-card, .pool-item-card').forEach(c => {
     c.addEventListener('dragstart', onDragStart);
@@ -2751,6 +2994,7 @@ function confirmPoolAdd(poolType) {
   const hardcoded = poolType === 'texts'            ? GENRE_ITEMS
                   : poolType === 'performanceTasks' ? PERF_ITEMS
                   : poolType === 'themes'           ? THEME_ITEMS
+                  : poolType === 'socialJustice'    ? [...Object.values(SJ_DOMAINS).flat().map(s => s.id)]
                   :                                   CURR_ITEMS;
   const existing = [...hardcoded, ...customItems[poolType]];
   if (existing.includes(label)) { inp.select(); return; }
@@ -2769,6 +3013,7 @@ function renderUnits() {
   const perfA   = activePerfAssignments();
   const themeA  = activeThemeAssignments();
   const currA   = activeCurrAssignments();
+  const sjA     = activeSjAssignments();
 
   let html = '';
   for (let u = 1; u <= 6; u++) {
@@ -2778,7 +3023,8 @@ function renderUnits() {
     const perfItems  = perfA[currentGrade][uKey] || [];
     const themeItems = themeA[currentGrade][uKey] || [];
     const currItems  = currA[currentGrade][uKey]  || [];
-    const totalItems = stds.length + genreItems.length + perfItems.length + themeItems.length + currItems.length;
+    const sjItems    = sjA[currentGrade][uKey]    || [];
+    const totalItems = stds.length + genreItems.length + perfItems.length + themeItems.length + currItems.length + sjItems.length;
 
     const titlePrefix = isHumanities ? 'Humanities ' : isSpanish ? 'Spanish ' : 'ELA ';
     const chip        = isHumanities ? '<span class="hum-chip">H</span>'
@@ -2841,6 +3087,16 @@ function renderUnits() {
                 onclick="removePoolItem(this)">&#215;</button>
       </div>`).join('');
 
+    const sjHtml = sjItems.map(sid => `
+      <div class="unit-std-item">
+        <div class="unit-std-info">
+          <span class="pool-tag sj-tag">SJ</span>
+          <div class="unit-std-code" style="margin-top:3px;color:${SJ_COLOR}">${sid}</div>
+        </div>
+        <button class="unit-std-remove" title="Remove"
+                onclick="removeSjFromUnit('${sid}',${u})">&#215;</button>
+      </div>`).join('');
+
     html += `
       <div class="unit-col unit--${u}${isHumanities?' hum':''}${isSpanish?' spa':''}"
            ondragover="onDragOver(event,this)"
@@ -2855,7 +3111,7 @@ function renderUnits() {
           <span class="unit-open-hint" title="Double-click to open detail">&#8599;</span>
         </div>
         <div class="unit-drop-zone">
-          ${totalItems ? (themeHtml + currHtml + genreHtml + perfHtml + stdHtml) : '<div class="unit-empty">Drop content here</div>'}
+          ${totalItems ? (themeHtml + currHtml + genreHtml + perfHtml + sjHtml + stdHtml) : '<div class="unit-empty">Drop content here</div>'}
         </div>
       </div>`;
   }
@@ -2907,11 +3163,18 @@ function renderDetailSidebar() {
   const u        = String(detailUnit);
   const unitStds = activeAssignments()[currentGrade][u] || [];
   const unitData = (activeAssessments()[currentGrade] || {})[u] || {};
+  const sjUnitStds = activeSjAssignments()[currentGrade][u] || [];
+  const sjUnitData = (activeSjAssessments()[currentGrade] || {})[u] || {};
 
   // Collect every assessment row that has BOTH type and date
   const scheduled = [];
   unitStds.forEach(sid => {
     (unitData[sid] || []).forEach((row, i) => {
+      if (row.type && row.date) scheduled.push({ sid, rowIndex: i, type: row.type, date: row.date, description: row.description || '' });
+    });
+  });
+  sjUnitStds.forEach(sid => {
+    (sjUnitData[sid] || []).forEach((row, i) => {
       if (row.type && row.date) scheduled.push({ sid, rowIndex: i, type: row.type, date: row.date, description: row.description || '' });
     });
   });
@@ -2952,25 +3215,31 @@ function renderDetailSidebar() {
 const MAX_CRITERIA = 5;
 
 function buildPerfTaskSection(u) {
+  // CCSS standards with PT assessments
   const stds  = activeAssignments()[currentGrade][u] || [];
   const asmts = activeAssessments();
   const crit  = activePtCriteria()[currentGrade][u] || {};
-
-  // Standards that have "Performance Task" in at least one assessment row
   const ptStds = stds.filter(sid => {
-    const unitAsmts = (asmts[currentGrade] || {})[u] || {};
-    const rows = unitAsmts[sid];
+    const rows = ((asmts[currentGrade] || {})[u] || {})[sid];
+    return Array.isArray(rows) && rows.some(r => r.type === 'Performance Task');
+  });
+
+  // SJ standards with PT assessments
+  const sjStds  = activeSjAssignments()[currentGrade][u] || [];
+  const sjAsmts = activeSjAssessments();
+  const sjCrit  = activeSjPtCriteria()[currentGrade][u] || {};
+  const ptSjStds = sjStds.filter(sid => {
+    const rows = ((sjAsmts[currentGrade] || {})[u] || {})[sid];
     return Array.isArray(rows) && rows.some(r => r.type === 'Performance Task');
   });
 
   const header = `<div class="pool-section-hdr">Performance Tasks</div>`;
 
-  if (ptStds.length === 0) {
+  if (ptStds.length === 0 && ptSjStds.length === 0) {
     return `${header}<div class="pt-empty">No Performance Task assessments assigned yet</div>`;
   }
 
-  const cards = ptStds.map(sid => {
-    const criteria = (crit[sid] && crit[sid].length > 0) ? crit[sid] : [''];
+  const buildCard = (sid, criteria, color, updateFn, addFn) => {
     const rows = criteria.map((val, i) => {
       const safeVal = val.replace(/"/g, '&quot;');
       return `
@@ -2978,21 +3247,31 @@ function buildPerfTaskSection(u) {
           <span class="pt-criterion-num">${i + 1}.</span>
           <input type="text" class="pt-criterion-input"
                  value="${safeVal}" placeholder="Mastery criterion…"
-                 oninput="updatePtCriterion('${sid}',${i},this.value)">
+                 oninput="${updateFn}('${sid}',${i},this.value)">
         </div>`;
     }).join('');
     const addBtn = criteria.length < MAX_CRITERIA
-      ? `<button class="pt-add-btn" onclick="addPtCriterion('${sid}')">+ Add criterion</button>`
+      ? `<button class="pt-add-btn" onclick="${addFn}('${sid}')">+ Add criterion</button>`
       : '';
     return `
-      <div class="pt-card" style="border-left-color:${PERF_COLOR}">
-        <div class="pt-card-code" style="color:${PERF_COLOR}">${sid}</div>
+      <div class="pt-card" style="border-left-color:${color}">
+        <div class="pt-card-code" style="color:${color}">${sid}</div>
         ${rows}
         ${addBtn}
       </div>`;
+  };
+
+  const ccssCards = ptStds.map(sid => {
+    const criteria = (crit[sid] && crit[sid].length > 0) ? crit[sid] : [''];
+    return buildCard(sid, criteria, PERF_COLOR, 'updatePtCriterion', 'addPtCriterion');
   }).join('');
 
-  return `${header}${cards}`;
+  const sjCards = ptSjStds.map(sid => {
+    const criteria = (sjCrit[sid] && sjCrit[sid].length > 0) ? sjCrit[sid] : [''];
+    return buildCard(sid, criteria, SJ_COLOR, 'updateSjPtCriterion', 'addSjPtCriterion');
+  }).join('');
+
+  return `${header}${ccssCards}${sjCards}`;
 }
 
 function renderPerfTaskSection() {
@@ -3023,8 +3302,9 @@ function addPtCriterion(sid) {
    RENDER — UNIT DETAIL VIEW
 ===================================================== */
 function renderDetailView() {
-  const u          = String(detailUnit);
+  const u      = String(detailUnit);
   const stds   = activeAssignments()[currentGrade][u] || [];
+  const sjStds = activeSjAssignments()[currentGrade][u] || [];
   const lookup = buildLookup(currentGrade);
   const el     = document.getElementById('detailContent');
 
@@ -3034,13 +3314,14 @@ function renderDetailView() {
   /* ── Bottom: standards + always-on PT section ────────── */
   let bottomHtml = '';
 
-  if (stds.length === 0) {
+  const hasAnyContent = stds.length > 0 || sjStds.length > 0;
+  if (!hasAnyContent) {
     bottomHtml = `<div class="detail-empty" style="padding:40px 20px">No content assigned yet.<br>
       <span style="font-size:.8rem;color:var(--text-light);margin-top:6px;display:block">
         Go back to the planner and drag standards or content into Unit ${detailUnit}.
       </span></div>`;
   } else {
-    /* ── Standards cards ─────────────────────────────────── */
+    /* ── CCSS Standards cards ────────────────────────────── */
     if (stds.length > 0) {
       bottomHtml += `<div class="pool-section-hdr">Standards</div>`;
       bottomHtml += stds.map(sid => {
@@ -3082,6 +3363,52 @@ function renderDetailView() {
           <div class="std-detail-card" style="border-left-color:${color}">
             <div class="std-detail-code" style="color:${color}">${std.id}</div>
             <div class="std-detail-desc">${std.desc}</div>
+            <hr class="asmt-divider">
+            <div class="asmt-rows">${asmtRows}</div>
+          </div>`;
+      }).join('');
+    }
+
+    /* ── Social Justice Standards cards ──────────────────── */
+    if (sjStds.length > 0) {
+      bottomHtml += `<div class="pool-section-hdr">Social Justice Standards</div>`;
+      bottomHtml += sjStds.map(sid => {
+        const std  = SJ_LOOKUP[sid] || { id: sid, desc: '' };
+        const rows = getSjAssessmentRows(currentGrade, detailUnit, sid);
+
+        const asmtRows = [0, 1].map(i => {
+          const row  = rows[i] || { type:'', date:'', description:'' };
+          const desc = row.description || '';
+          const wc   = wordCount(desc);
+          return `
+            <div class="asmt-row">
+              <div class="asmt-row-top">
+                <span class="asmt-label">Assessment ${i + 1}</span>
+                <select class="asmt-select"
+                        onchange="updateSjAssessment('${sid}',${i},'type',this.value)">
+                  <option value=""                 ${row.type===''                 ?'selected':''}>&#8212; select type &#8212;</option>
+                  <option value="Quiz"             ${row.type==='Quiz'             ?'selected':''}>Quiz</option>
+                  <option value="Writing Task"     ${row.type==='Writing Task'     ?'selected':''}>Writing Task</option>
+                  <option value="Project"          ${row.type==='Project'          ?'selected':''}>Project</option>
+                  <option value="Final Assessment" ${row.type==='Final Assessment' ?'selected':''}>Final Assessment</option>
+                  <option value="Performance Task" ${row.type==='Performance Task' ?'selected':''}>Performance Task</option>
+                </select>
+                <input type="date" class="asmt-date" value="${row.date || ''}"
+                       onchange="updateSjAssessment('${sid}',${i},'date',this.value)">
+              </div>
+              <div class="asmt-row-bottom">
+                <input type="text" class="asmt-desc" placeholder="Brief description..."
+                       value="${desc.replace(/"/g, '&quot;')}"
+                       oninput="handleSjDescInput('${sid}',${i},this)">
+                <span class="asmt-word-count${wc >= MAX_WORDS ? ' at-limit' : ''}">${wc}/${MAX_WORDS}</span>
+              </div>
+            </div>`;
+        }).join('');
+
+        return `
+          <div class="std-detail-card" style="border-left-color:${SJ_COLOR}">
+            <div class="std-detail-code" style="color:${SJ_COLOR}">${std.id}</div>
+            ${std.desc ? `<div class="std-detail-desc">${std.desc}</div>` : ''}
             <hr class="asmt-divider">
             <div class="asmt-rows">${asmtRows}</div>
           </div>`;
