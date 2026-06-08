@@ -889,6 +889,35 @@
     }
     .pt-add-btn:hover { text-decoration: underline; }
 
+    /* ── Pool "+ Add item" button & inline input ─────────── */
+    .pool-add-btn {
+      background: none; border: none; color: var(--text-light);
+      font: 500 .71rem 'Inter', sans-serif; cursor: pointer;
+      padding: 5px 8px 8px; display: block; width: 100%;
+      text-align: left; letter-spacing: .01em; transition: color .14s;
+    }
+    .pool-add-btn:hover { color: var(--accent); }
+    .pool-add-row {
+      display: none; align-items: center; gap: 5px; padding: 2px 8px 8px;
+    }
+    .pool-add-input {
+      flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 4px;
+      padding: 4px 7px; font: .75rem 'Inter', sans-serif; color: var(--text);
+      background: var(--bg-card);
+    }
+    .pool-add-input:focus { outline: none; border-color: var(--accent); }
+    .pool-add-confirm {
+      background: var(--accent); color: #fff; border: none; border-radius: 4px;
+      padding: 4px 10px; font: 600 .71rem 'Inter', sans-serif; cursor: pointer;
+      white-space: nowrap; transition: background .14s;
+    }
+    .pool-add-confirm:hover { background: #c96a2a; }
+    .pool-add-cancel {
+      background: none; border: none; color: var(--text-light); cursor: pointer;
+      font-size: 1.05rem; line-height: 1; padding: 2px 3px; transition: color .14s;
+    }
+    .pool-add-cancel:hover { color: var(--text); }
+
     /* Section header inside unit detail view */
     .pool-section-hdr {
       font-size: .70rem;
@@ -1245,6 +1274,9 @@ let spPerfDetails      = makeDefaultDetails();
 let spThemeDetails     = makeDefaultDetails();
 let spCurrDetails      = makeDefaultDetails();
 let spUnitDetails      = makeDefaultUnitDetails();
+
+/* Custom items added by teachers to each pool */
+let customItems = { texts: [], performanceTasks: [], themes: [], curriculum: [] };
 
 function makeDefaultAssignments() {
   const a = {};
@@ -1678,6 +1710,14 @@ function startSync() {
       spCurrDetails       = decodeDetailMap(data.spanishCurrDetails);
       spUnitDetails       = decodeUnitDetails(data.spanishUnitDetails);
       spPtCriteria        = decodePtCriteria(data.spanishPtCriteria);
+      /* Custom pool items */
+      const ci = data.customItems || {};
+      customItems = {
+        texts:            Array.isArray(ci.texts)            ? ci.texts            : [],
+        performanceTasks: Array.isArray(ci.performanceTasks) ? ci.performanceTasks : [],
+        themes:           Array.isArray(ci.themes)           ? ci.themes           : [],
+        curriculum:       Array.isArray(ci.curriculum)       ? ci.curriculum       : [],
+      };
       // Only auto-re-render the main view from snapshots;
       // in detail view we skip re-render to preserve input focus.
       if (currentView === 'main') render();
@@ -1731,6 +1771,13 @@ async function writeToFirestore() {
       performanceTaskCriteria: encodePtCriteria(ptCriteria),
       humanitiesPtCriteria:    encodePtCriteria(humPtCriteria),
       spanishPtCriteria:       encodePtCriteria(spPtCriteria),
+      /* Custom pool items */
+      customItems: {
+        texts:            customItems.texts,
+        performanceTasks: customItems.performanceTasks,
+        themes:           customItems.themes,
+        curriculum:       customItems.curriculum,
+      },
     });
   } catch (err) {
     console.error('Firestore write error:', err);
@@ -2494,7 +2541,7 @@ function renderPool() {
   });
 
   /* ── Genre Pool section ─────────────────────────────── */
-  const genreAsgn   = activeGenreAssignments();
+  const genreAsgn    = activeGenreAssignments();
   const genreUnitMap = {};
   for (let u = 1; u <= 6; u++) {
     (genreAsgn[currentGrade][String(u)] || []).forEach(label => {
@@ -2502,7 +2549,8 @@ function renderPool() {
       genreUnitMap[label].push(u);
     });
   }
-  const genreCards = GENRE_ITEMS.map(label => {
+  const allGenreItems = [...GENRE_ITEMS, ...customItems.texts];
+  const genreCards = allGenreItems.map(label => {
     const units = genreUnitMap[label] || [];
     const pips  = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
     return `
@@ -2521,14 +2569,23 @@ function renderPool() {
       <div class="strand-header" onclick="toggleStrand(this)">
         <div class="strand-dot" style="background:${GENRE_COLOR}"></div>
         <span class="strand-name" style="color:${GENRE_COLOR}">Texts</span>
-        <span class="strand-count">${GENRE_ITEMS.length}</span>
+        <span class="strand-count">${allGenreItems.length}</span>
         <span class="strand-chevron">&#9662;</span>
       </div>
-      <div class="strand-cards">${genreCards}</div>
+      <div class="strand-cards">
+        ${genreCards}
+        <button class="pool-add-btn" id="pool-add-btn-texts" onclick="showPoolAddInput('texts')">+ Add item</button>
+        <div class="pool-add-row" id="pool-add-row-texts">
+          <input class="pool-add-input" id="pool-add-input-texts" type="text" placeholder="New text type…"
+                 onkeydown="if(event.key==='Enter')confirmPoolAdd('texts');else if(event.key==='Escape')cancelPoolAdd('texts')">
+          <button class="pool-add-confirm" onmousedown="event.preventDefault()" onclick="confirmPoolAdd('texts')">Add</button>
+          <button class="pool-add-cancel" onmousedown="event.preventDefault()" onclick="cancelPoolAdd('texts')">&#215;</button>
+        </div>
+      </div>
     </div>`;
 
   /* ── Performance Tasks section ───────────────────────── */
-  const perfAsgn   = activePerfAssignments();
+  const perfAsgn    = activePerfAssignments();
   const perfUnitMap = {};
   for (let u = 1; u <= 6; u++) {
     (perfAsgn[currentGrade][String(u)] || []).forEach(label => {
@@ -2536,7 +2593,8 @@ function renderPool() {
       perfUnitMap[label].push(u);
     });
   }
-  const perfCards = PERF_ITEMS.map(label => {
+  const allPerfItems = [...PERF_ITEMS, ...customItems.performanceTasks];
+  const perfCards = allPerfItems.map(label => {
     const units = perfUnitMap[label] || [];
     const pips  = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
     return `
@@ -2555,14 +2613,23 @@ function renderPool() {
       <div class="strand-header" onclick="toggleStrand(this)">
         <div class="strand-dot" style="background:${PERF_COLOR}"></div>
         <span class="strand-name" style="color:${PERF_COLOR}">Performance Tasks</span>
-        <span class="strand-count">${PERF_ITEMS.length}</span>
+        <span class="strand-count">${allPerfItems.length}</span>
         <span class="strand-chevron">&#9662;</span>
       </div>
-      <div class="strand-cards">${perfCards}</div>
+      <div class="strand-cards">
+        ${perfCards}
+        <button class="pool-add-btn" id="pool-add-btn-performanceTasks" onclick="showPoolAddInput('performanceTasks')">+ Add item</button>
+        <div class="pool-add-row" id="pool-add-row-performanceTasks">
+          <input class="pool-add-input" id="pool-add-input-performanceTasks" type="text" placeholder="New task type…"
+                 onkeydown="if(event.key==='Enter')confirmPoolAdd('performanceTasks');else if(event.key==='Escape')cancelPoolAdd('performanceTasks')">
+          <button class="pool-add-confirm" onmousedown="event.preventDefault()" onclick="confirmPoolAdd('performanceTasks')">Add</button>
+          <button class="pool-add-cancel" onmousedown="event.preventDefault()" onclick="cancelPoolAdd('performanceTasks')">&#215;</button>
+        </div>
+      </div>
     </div>`;
 
   /* ── Themes section ──────────────────────────────────── */
-  const themeAsgn   = activeThemeAssignments();
+  const themeAsgn    = activeThemeAssignments();
   const themeUnitMap = {};
   for (let u = 1; u <= 6; u++) {
     (themeAsgn[currentGrade][String(u)] || []).forEach(label => {
@@ -2570,7 +2637,8 @@ function renderPool() {
       themeUnitMap[label].push(u);
     });
   }
-  const themeCards = THEME_ITEMS.map(label => {
+  const allThemeItems = [...THEME_ITEMS, ...customItems.themes];
+  const themeCards = allThemeItems.map(label => {
     const units = themeUnitMap[label] || [];
     const pips  = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
     return `
@@ -2589,14 +2657,23 @@ function renderPool() {
       <div class="strand-header" onclick="toggleStrand(this)">
         <div class="strand-dot" style="background:${THEME_COLOR}"></div>
         <span class="strand-name" style="color:${THEME_COLOR}">Themes</span>
-        <span class="strand-count">${THEME_ITEMS.length}</span>
+        <span class="strand-count">${allThemeItems.length}</span>
         <span class="strand-chevron">&#9662;</span>
       </div>
-      <div class="strand-cards">${themeCards}</div>
+      <div class="strand-cards">
+        ${themeCards}
+        <button class="pool-add-btn" id="pool-add-btn-themes" onclick="showPoolAddInput('themes')">+ Add item</button>
+        <div class="pool-add-row" id="pool-add-row-themes">
+          <input class="pool-add-input" id="pool-add-input-themes" type="text" placeholder="New theme…"
+                 onkeydown="if(event.key==='Enter')confirmPoolAdd('themes');else if(event.key==='Escape')cancelPoolAdd('themes')">
+          <button class="pool-add-confirm" onmousedown="event.preventDefault()" onclick="confirmPoolAdd('themes')">Add</button>
+          <button class="pool-add-cancel" onmousedown="event.preventDefault()" onclick="cancelPoolAdd('themes')">&#215;</button>
+        </div>
+      </div>
     </div>`;
 
   /* ── Curriculum section ───────────────────────────────── */
-  const currAsgn   = activeCurrAssignments();
+  const currAsgn    = activeCurrAssignments();
   const currUnitMap = {};
   for (let u = 1; u <= 6; u++) {
     (currAsgn[currentGrade][String(u)] || []).forEach(label => {
@@ -2604,7 +2681,8 @@ function renderPool() {
       currUnitMap[label].push(u);
     });
   }
-  const currCards = CURR_ITEMS.map(label => {
+  const allCurrItems = [...CURR_ITEMS, ...customItems.curriculum];
+  const currCards = allCurrItems.map(label => {
     const units = currUnitMap[label] || [];
     const pips  = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
     return `
@@ -2623,10 +2701,19 @@ function renderPool() {
       <div class="strand-header" onclick="toggleStrand(this)">
         <div class="strand-dot" style="background:${CURR_COLOR}"></div>
         <span class="strand-name" style="color:${CURR_COLOR}">Curriculum</span>
-        <span class="strand-count">${CURR_ITEMS.length}</span>
+        <span class="strand-count">${allCurrItems.length}</span>
         <span class="strand-chevron">&#9662;</span>
       </div>
-      <div class="strand-cards">${currCards}</div>
+      <div class="strand-cards">
+        ${currCards}
+        <button class="pool-add-btn" id="pool-add-btn-curriculum" onclick="showPoolAddInput('curriculum')">+ Add item</button>
+        <div class="pool-add-row" id="pool-add-row-curriculum">
+          <input class="pool-add-input" id="pool-add-input-curriculum" type="text" placeholder="New curriculum…"
+                 onkeydown="if(event.key==='Enter')confirmPoolAdd('curriculum');else if(event.key==='Escape')cancelPoolAdd('curriculum')">
+          <button class="pool-add-confirm" onmousedown="event.preventDefault()" onclick="confirmPoolAdd('curriculum')">Add</button>
+          <button class="pool-add-cancel" onmousedown="event.preventDefault()" onclick="cancelPoolAdd('curriculum')">&#215;</button>
+        </div>
+      </div>
     </div>`;
 
   document.getElementById('poolBody').innerHTML = html;
@@ -2634,6 +2721,42 @@ function renderPool() {
     c.addEventListener('dragstart', onDragStart);
     c.addEventListener('dragend',   onDragEnd);
   });
+}
+
+/* =====================================================
+   CUSTOM POOL ITEMS — add / confirm / cancel
+===================================================== */
+function showPoolAddInput(poolType) {
+  const row = document.getElementById('pool-add-row-' + poolType);
+  const btn = document.getElementById('pool-add-btn-' + poolType);
+  if (row) row.style.display = 'flex';
+  if (btn) btn.style.display = 'none';
+  const inp = document.getElementById('pool-add-input-' + poolType);
+  if (inp) { inp.value = ''; inp.focus(); }
+}
+
+function cancelPoolAdd(poolType) {
+  const row = document.getElementById('pool-add-row-' + poolType);
+  const btn = document.getElementById('pool-add-btn-' + poolType);
+  if (row) row.style.display = 'none';
+  if (btn) btn.style.display = '';
+}
+
+function confirmPoolAdd(poolType) {
+  const inp = document.getElementById('pool-add-input-' + poolType);
+  if (!inp) return;
+  const label = inp.value.trim();
+  if (!label) { inp.focus(); return; }
+  // Reject duplicates (hardcoded + existing custom)
+  const hardcoded = poolType === 'texts'            ? GENRE_ITEMS
+                  : poolType === 'performanceTasks' ? PERF_ITEMS
+                  : poolType === 'themes'           ? THEME_ITEMS
+                  :                                   CURR_ITEMS;
+  const existing = [...hardcoded, ...customItems[poolType]];
+  if (existing.includes(label)) { inp.select(); return; }
+  customItems[poolType].push(label);
+  writeToFirestore();
+  renderPool(); // re-renders pool panel with new item
 }
 
 function renderUnits() {
