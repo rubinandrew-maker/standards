@@ -390,6 +390,13 @@
       background: #FECDD3; color: #BE123C;
       flex-shrink: 0; line-height: 1.5;
     }
+    .unit-col.tri .unit-col-head { background: #FFFBEB; }
+    .tri-chip {
+      font-size: .53rem; font-weight: 800; text-transform: uppercase;
+      letter-spacing: .04em; padding: 1px 4px; border-radius: 3px;
+      background: #FDE68A; color: #92400E;
+      flex-shrink: 0; line-height: 1.5;
+    }
 
     /* ── DETAIL VIEW ─────────────────────────────────────── */
     .detail-view {
@@ -1323,6 +1330,19 @@ let spThemeDetails     = makeDefaultDetails();
 let spCurrDetails      = makeDefaultDetails();
 let spUnitDetails      = makeDefaultUnitDetails();
 
+/* Trimesters — separate data per grade, 3 units (1-3) */
+let trimAssignments      = makeDefaultAssignments();
+let trimAssessments      = makeDefaultAssessments();
+let trimGenreAssignments = makeDefaultPoolAssignments();
+let trimPerfAssignments  = makeDefaultPoolAssignments();
+let trimThemeAssignments = makeDefaultPoolAssignments();
+let trimCurrAssignments  = makeDefaultPoolAssignments();
+let trimSjAssignments    = makeDefaultAssignments();
+let trimSjAssessments    = makeDefaultAssessments();
+let trimUnitDetails      = makeDefaultUnitDetails();
+let trimPtCriteria       = makeDefaultPtCriteria();
+let trimSjPtCriteria     = makeDefaultPtCriteria();
+
 /* Social Justice Standards assignments / assessments / PT criteria */
 let sjAssignments    = makeDefaultAssignments();
 let sjAssessments    = makeDefaultAssessments();
@@ -1779,6 +1799,19 @@ function startSync() {
       spCurrDetails       = decodeDetailMap(data.spanishCurrDetails);
       spUnitDetails       = decodeUnitDetails(data.spanishUnitDetails);
       spPtCriteria        = decodePtCriteria(data.spanishPtCriteria);
+      /* Trimesters */
+      const tri = data.trimesters || {};
+      trimAssignments      = decodeUnits(tri.units);
+      trimAssessments      = decodeAssessments(tri.assessments);
+      trimGenreAssignments = decodePoolAssignments(tri.genreAssignments);
+      trimPerfAssignments  = decodePoolAssignments(tri.perfAssignments);
+      trimThemeAssignments = decodePoolAssignments(tri.themeAssignments);
+      trimCurrAssignments  = decodePoolAssignments(tri.currAssignments);
+      trimSjAssignments    = decodeUnits(tri.sjUnits);
+      trimSjAssessments    = decodeAssessments(tri.sjAssessments);
+      trimUnitDetails      = decodeUnitDetails(tri.unitDetails);
+      trimPtCriteria       = decodePtCriteria(tri.ptCriteria);
+      trimSjPtCriteria     = decodePtCriteria(tri.sjPtCriteria);
       /* Social Justice Standards */
       sjAssignments    = decodeUnits(data.sjUnits);
       sjAssessments    = decodeAssessments(data.sjAssessments);
@@ -1851,6 +1884,20 @@ async function writeToFirestore() {
       performanceTaskCriteria: encodePtCriteria(ptCriteria),
       humanitiesPtCriteria:    encodePtCriteria(humPtCriteria),
       spanishPtCriteria:       encodePtCriteria(spPtCriteria),
+      /* Trimesters */
+      trimesters: {
+        units:            encodeUnits(trimAssignments),
+        assessments:      encodeAssessments(trimAssessments),
+        genreAssignments: encodePoolAssignments(trimGenreAssignments),
+        perfAssignments:  encodePoolAssignments(trimPerfAssignments),
+        themeAssignments: encodePoolAssignments(trimThemeAssignments),
+        currAssignments:  encodePoolAssignments(trimCurrAssignments),
+        sjUnits:          encodeUnits(trimSjAssignments),
+        sjAssessments:    encodeAssessments(trimSjAssessments),
+        unitDetails:      encodeUnitDetails(trimUnitDetails),
+        ptCriteria:       encodePtCriteria(trimPtCriteria),
+        sjPtCriteria:     encodePtCriteria(trimSjPtCriteria),
+      },
       /* Social Justice Standards */
       sjUnits:                encodeUnits(sjAssignments),
       sjAssessments:          encodeAssessments(sjAssessments),
@@ -1886,26 +1933,27 @@ function activeType() {
 }
 function isHum() { return activeType() === 'hum'; }
 function isSpa() { return activeType() === 'spa'; }
+function isTri() { return activeType() === 'tri'; }
 
 function activeAssignments() {
   const t = activeType();
-  return t === 'hum' ? humAssignments : t === 'spa' ? spAssignments : assignments;
+  return t === 'hum' ? humAssignments : t === 'spa' ? spAssignments : t === 'tri' ? trimAssignments : assignments;
 }
 function activeAssessments() {
   const t = activeType();
-  return t === 'hum' ? humAssessments : t === 'spa' ? spAssessments : assessments;
+  return t === 'hum' ? humAssessments : t === 'spa' ? spAssessments : t === 'tri' ? trimAssessments : assessments;
 }
 function activeGenreAssignments() {
   const t = activeType();
-  return t === 'hum' ? humGenreAssignments : t === 'spa' ? spGenreAssignments : genreAssignments;
+  return t === 'hum' ? humGenreAssignments : t === 'spa' ? spGenreAssignments : t === 'tri' ? trimGenreAssignments : genreAssignments;
 }
 function activePerfAssignments() {
   const t = activeType();
-  return t === 'hum' ? humPerfAssignments : t === 'spa' ? spPerfAssignments : performanceAssignments;
+  return t === 'hum' ? humPerfAssignments : t === 'spa' ? spPerfAssignments : t === 'tri' ? trimPerfAssignments : performanceAssignments;
 }
 function activeThemeAssignments() {
   const t = activeType();
-  return t === 'hum' ? humThemeAssignments : t === 'spa' ? spThemeAssignments : themeAssignments;
+  return t === 'hum' ? humThemeAssignments : t === 'spa' ? spThemeAssignments : t === 'tri' ? trimThemeAssignments : themeAssignments;
 }
 function activeGenreDetails() {
   const t = activeType();
@@ -1921,7 +1969,7 @@ function activeThemeDetails() {
 }
 function activeCurrAssignments() {
   const t = activeType();
-  return t === 'hum' ? humCurrAssignments : t === 'spa' ? spCurrAssignments : curriculumAssignments;
+  return t === 'hum' ? humCurrAssignments : t === 'spa' ? spCurrAssignments : t === 'tri' ? trimCurrAssignments : curriculumAssignments;
 }
 function activeCurrDetails() {
   const t = activeType();
@@ -1929,23 +1977,23 @@ function activeCurrDetails() {
 }
 function activeUnitDetails() {
   const t = activeType();
-  return t === 'hum' ? humUnitDetails : t === 'spa' ? spUnitDetails : unitDetails;
+  return t === 'hum' ? humUnitDetails : t === 'spa' ? spUnitDetails : t === 'tri' ? trimUnitDetails : unitDetails;
 }
 function activePtCriteria() {
   const t = activeType();
-  return t === 'hum' ? humPtCriteria : t === 'spa' ? spPtCriteria : ptCriteria;
+  return t === 'hum' ? humPtCriteria : t === 'spa' ? spPtCriteria : t === 'tri' ? trimPtCriteria : ptCriteria;
 }
 function activeSjAssignments() {
   const t = activeType();
-  return t === 'hum' ? humSjAssignments : t === 'spa' ? spSjAssignments : sjAssignments;
+  return t === 'hum' ? humSjAssignments : t === 'spa' ? spSjAssignments : t === 'tri' ? trimSjAssignments : sjAssignments;
 }
 function activeSjAssessments() {
   const t = activeType();
-  return t === 'hum' ? humSjAssessments : t === 'spa' ? spSjAssessments : sjAssessments;
+  return t === 'hum' ? humSjAssessments : t === 'spa' ? spSjAssessments : t === 'tri' ? trimSjAssessments : sjAssessments;
 }
 function activeSjPtCriteria() {
   const t = activeType();
-  return t === 'hum' ? humSjPtCriteria : t === 'spa' ? spSjPtCriteria : sjPtCriteria;
+  return t === 'hum' ? humSjPtCriteria : t === 'spa' ? spSjPtCriteria : t === 'tri' ? trimSjPtCriteria : sjPtCriteria;
 }
 
 /* Toggle between ELA and Humanities unit grids (per grade) */
@@ -2532,7 +2580,7 @@ function openUnitDetail(unit, evt, unitType) {
   detailUnit     = unit;
   detailUnitType = unitType || currentUnitType[currentGrade];
   currentView    = 'unit';
-  const typeLabel = detailUnitType === 'hum' ? 'Humanities ' : detailUnitType === 'spa' ? 'Spanish ' : 'ELA ';
+  const typeLabel = detailUnitType === 'hum' ? 'Humanities ' : detailUnitType === 'spa' ? 'Spanish ' : detailUnitType === 'tri' ? 'Trimester ' : 'ELA ';
   document.getElementById('mainCtrl').style.display   = 'none';
   document.getElementById('detailCtrl').style.display  = 'flex';
   document.getElementById('detailTitle').textContent   = `Grade ${currentGrade} — ${typeLabel}${unit}`;
@@ -2657,6 +2705,7 @@ function renderUnitToggle() {
   const active = currentUnitType[currentGrade];
   document.getElementById('unitTypeToggle').innerHTML = `
     <div class="unit-type-toggle">
+      <button class="toggle-btn${active==='tri'?' active':''}" onclick="switchUnitType('tri')">Trimesters</button>
       <button class="toggle-btn${active==='ela'?' active':''}" onclick="switchUnitType('ela')">ELA</button>
       <button class="toggle-btn${active==='hum'?' active':''}" onclick="switchUnitType('hum')">Humanities</button>
       <button class="toggle-btn${active==='spa'?' active':''}" onclick="switchUnitType('spa')">Spanish</button>
@@ -3004,9 +3053,119 @@ function confirmPoolAdd(poolType) {
   renderPool(); // re-renders pool panel with new item
 }
 
+function renderTrimesterUnits() {
+  /* Uses the same active-accessor pattern — all accessors already route to
+     trim* data when activeType() === 'tri' (detailUnitType or currentUnitType). */
+  const lookup = buildLookup(currentGrade);
+  const asgn   = activeAssignments();
+  const genreA = activeGenreAssignments();
+  const perfA  = activePerfAssignments();
+  const themeA = activeThemeAssignments();
+  const currA  = activeCurrAssignments();
+  const sjA    = activeSjAssignments();
+
+  let html = '';
+  for (let u = 1; u <= 3; u++) {
+    const uKey       = String(u);
+    const stds       = asgn[currentGrade][uKey] || [];
+    const genreItems = genreA[currentGrade][uKey] || [];
+    const perfItems  = perfA[currentGrade][uKey] || [];
+    const themeItems = themeA[currentGrade][uKey] || [];
+    const currItems  = currA[currentGrade][uKey]  || [];
+    const sjItems    = sjA[currentGrade][uKey]    || [];
+    const totalItems = stds.length + genreItems.length + perfItems.length + themeItems.length + currItems.length + sjItems.length;
+
+    const stdHtml = stds.map(sid => {
+      const s = lookup[sid];
+      if (!s) return '';
+      return `
+        <div class="unit-std-item">
+          <div class="unit-std-info">
+            <div class="unit-std-code">${s.id}</div>
+          </div>
+          <button class="unit-std-remove" onclick="removeFromUnit('${sid}',${u})" title="Remove">&#215;</button>
+        </div>`;
+    }).join('');
+
+    const genreHtml = genreItems.map(label => `
+      <div class="unit-std-item">
+        <div class="unit-std-info">
+          <span class="pool-tag genre-tag">Texts</span>
+          <div class="unit-std-code" style="margin-top:3px">${label}</div>
+        </div>
+        <button class="unit-std-remove" title="Remove"
+                data-pool-type="genre" data-label="${label.replace(/"/g,'&quot;')}" data-unit="${u}"
+                onclick="removePoolItem(this)">&#215;</button>
+      </div>`).join('');
+
+    const perfHtml = perfItems.map(label => `
+      <div class="unit-std-item">
+        <div class="unit-std-info">
+          <span class="pool-tag perf-tag">Task</span>
+          <div class="unit-std-code" style="margin-top:3px">${label}</div>
+        </div>
+        <button class="unit-std-remove" title="Remove"
+                data-pool-type="perf" data-label="${label.replace(/"/g,'&quot;')}" data-unit="${u}"
+                onclick="removePoolItem(this)">&#215;</button>
+      </div>`).join('');
+
+    const themeHtml = themeItems.map(label => `
+      <div class="unit-std-item">
+        <div class="unit-std-info">
+          <span class="pool-tag theme-tag">Theme</span>
+          <div class="unit-std-code" style="margin-top:3px">${label}</div>
+        </div>
+        <button class="unit-std-remove" title="Remove"
+                data-pool-type="theme" data-label="${label.replace(/"/g,'&quot;')}" data-unit="${u}"
+                onclick="removePoolItem(this)">&#215;</button>
+      </div>`).join('');
+
+    const currHtml = currItems.map(label => `
+      <div class="unit-std-item">
+        <div class="unit-std-info">
+          <span class="pool-tag curr-tag">Curr</span>
+          <div class="unit-std-code" style="margin-top:3px">${label}</div>
+        </div>
+        <button class="unit-std-remove" title="Remove"
+                data-pool-type="curr" data-label="${label.replace(/"/g,'&quot;')}" data-unit="${u}"
+                onclick="removePoolItem(this)">&#215;</button>
+      </div>`).join('');
+
+    const sjHtml = sjItems.map(sid => `
+      <div class="unit-std-item">
+        <div class="unit-std-info">
+          <span class="pool-tag sj-tag">SJ</span>
+          <div class="unit-std-code" style="margin-top:3px;color:${SJ_COLOR}">${sid}</div>
+        </div>
+        <button class="unit-std-remove" title="Remove"
+                onclick="removeSjFromUnit('${sid}',${u})">&#215;</button>
+      </div>`).join('');
+
+    html += `
+      <div class="unit-col unit--${u} tri"
+           ondragover="onDragOver(event,this)"
+           ondragleave="onDragLeave(event,this)"
+           ondrop="onDrop(event,${u},this)"
+           ondblclick="openUnitDetail(${u},event,'tri')">
+        <div class="unit-col-head">
+          <div class="unit-badge">${u}</div>
+          <span class="tri-chip">T</span>
+          <span class="unit-col-title">Trimester ${u}</span>
+          <span class="unit-std-count">${stds.length} std${stds.length!==1?'s':''}</span>
+          <span class="unit-open-hint" title="Double-click to open detail">&#8599;</span>
+        </div>
+        <div class="unit-drop-zone">
+          ${totalItems ? (themeHtml + currHtml + genreHtml + perfHtml + sjHtml + stdHtml) : '<div class="unit-empty">Drop content here</div>'}
+        </div>
+      </div>`;
+  }
+  document.getElementById('unitGrid').innerHTML = html;
+}
+
 function renderUnits() {
+  const unitType = currentUnitType[currentGrade]; // 'ela' | 'hum' | 'spa' | 'tri'
+  if (unitType === 'tri') { renderTrimesterUnits(); return; }
   const lookup   = buildLookup(currentGrade);
-  const unitType = currentUnitType[currentGrade]; // 'ela' | 'hum' | 'spa'
   const isHumanities = unitType === 'hum';
   const isSpanish    = unitType === 'spa';
   const asgn    = activeAssignments();
