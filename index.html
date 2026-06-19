@@ -912,6 +912,17 @@
       text-align: left; letter-spacing: .01em; transition: color .14s;
     }
     .pool-add-btn:hover { color: var(--accent); }
+
+    /* Delete button shown on hover for custom pool items */
+    .pool-custom-delete {
+      background: none; border: none; color: var(--text-light); cursor: pointer;
+      font-size: .75rem; line-height: 1; padding: 1px 3px; margin-left: auto;
+      flex-shrink: 0; opacity: 0; transition: opacity .14s, color .14s;
+      border-radius: 3px;
+    }
+    .pool-item-card:hover .pool-custom-delete,
+    .std-card:hover .pool-custom-delete { opacity: 1; }
+    .pool-custom-delete:hover { color: #DC2626; }
     .pool-add-row {
       display: none; align-items: center; gap: 5px; padding: 2px 8px 8px;
     }
@@ -2776,14 +2787,17 @@ function renderPool() {
   }
   const allGenreItems = [...GENRE_ITEMS, ...customItems.texts];
   const genreCards = allGenreItems.map(label => {
-    const units = genreUnitMap[label] || [];
-    const pips  = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
+    const units   = genreUnitMap[label] || [];
+    const pips    = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
+    const isCustom = customItems.texts.includes(label);
+    const delBtn  = isCustom ? `<button class="pool-custom-delete" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();deleteCustomItem('texts','${label.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">&#215;</button>` : '';
     return `
       <div class="pool-item-card" draggable="true" data-drag-id="genre::${label}"
            style="border-left-color:${GENRE_COLOR}">
         <div class="pool-item-top">
           <span class="pool-tag genre-tag">Texts</span>
           <span class="pool-item-label">${label}</span>
+          ${delBtn}
         </div>
         ${units.length ? `<div class="std-card-pips">${pips}</div>` : ''}
       </div>`;
@@ -2820,14 +2834,17 @@ function renderPool() {
   }
   const allPerfItems = [...PERF_ITEMS, ...customItems.performanceTasks];
   const perfCards = allPerfItems.map(label => {
-    const units = perfUnitMap[label] || [];
-    const pips  = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
+    const units    = perfUnitMap[label] || [];
+    const pips     = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
+    const isCustom = customItems.performanceTasks.includes(label);
+    const delBtn   = isCustom ? `<button class="pool-custom-delete" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();deleteCustomItem('performanceTasks','${label.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">&#215;</button>` : '';
     return `
       <div class="pool-item-card" draggable="true" data-drag-id="perf::${label}"
            style="border-left-color:${PERF_COLOR}">
         <div class="pool-item-top">
           <span class="pool-tag perf-tag">Task</span>
           <span class="pool-item-label">${label}</span>
+          ${delBtn}
         </div>
         ${units.length ? `<div class="std-card-pips">${pips}</div>` : ''}
       </div>`;
@@ -2864,14 +2881,17 @@ function renderPool() {
   }
   const allThemeItems = [...THEME_ITEMS, ...customItems.themes];
   const themeCards = allThemeItems.map(label => {
-    const units = themeUnitMap[label] || [];
-    const pips  = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
+    const units    = themeUnitMap[label] || [];
+    const pips     = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
+    const isCustom = customItems.themes.includes(label);
+    const delBtn   = isCustom ? `<button class="pool-custom-delete" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();deleteCustomItem('themes','${label.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">&#215;</button>` : '';
     return `
       <div class="pool-item-card" draggable="true" data-drag-id="theme::${label}"
            style="border-left-color:${THEME_COLOR}">
         <div class="pool-item-top">
           <span class="pool-tag theme-tag">Theme</span>
           <span class="pool-item-label">${label}</span>
+          ${delBtn}
         </div>
         ${units.length ? `<div class="std-card-pips">${pips}</div>` : ''}
       </div>`;
@@ -2908,14 +2928,17 @@ function renderPool() {
   }
   const allCurrItems = [...CURR_ITEMS, ...customItems.curriculum];
   const currCards = allCurrItems.map(label => {
-    const units = currUnitMap[label] || [];
-    const pips  = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
+    const units    = currUnitMap[label] || [];
+    const pips     = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
+    const isCustom = customItems.curriculum.includes(label);
+    const delBtn   = isCustom ? `<button class="pool-custom-delete" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();deleteCustomItem('curriculum','${label.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">&#215;</button>` : '';
     return `
       <div class="pool-item-card" draggable="true" data-drag-id="curriculum::${label}"
            style="border-left-color:${CURR_COLOR}">
         <div class="pool-item-top">
           <span class="pool-tag curr-tag">Curr</span>
           <span class="pool-item-label">${label}</span>
+          ${delBtn}
         </div>
         ${units.length ? `<div class="std-card-pips">${pips}</div>` : ''}
       </div>`;
@@ -2979,12 +3002,16 @@ function renderPool() {
 
   // Custom SJ items + Add button (shown in a final Action-style section)
   const sjCustomCards = customItems.socialJustice.map(sid => {
-    const units = sjUnitMap[sid] || [];
-    const pips  = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
+    const units  = sjUnitMap[sid] || [];
+    const pips   = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
+    const delBtn = `<button class="pool-custom-delete" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();deleteCustomItem('socialJustice','${sid.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">&#215;</button>`;
     return `
       <div class="std-card" draggable="true" data-drag-id="sj::${sid}"
            style="border-left-color:${SJ_COLOR}">
-        <div class="std-card-code" style="color:${SJ_COLOR}">${sid}</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <div class="std-card-code" style="color:${SJ_COLOR};flex:1">${sid}</div>
+          ${delBtn}
+        </div>
         ${units.length ? `<div class="std-card-pips">${pips}</div>` : ''}
       </div>`;
   }).join('');
@@ -3051,6 +3078,13 @@ function confirmPoolAdd(poolType) {
   customItems[poolType].push(label);
   writeToFirestore();
   renderPool(); // re-renders pool panel with new item
+}
+
+function deleteCustomItem(poolType, label) {
+  if (!confirm(`Remove "${label}" from the pool? It will stay in any unit columns where it was already placed.`)) return;
+  const arr = customItems[poolType];
+  const i   = arr.indexOf(label);
+  if (i > -1) { arr.splice(i, 1); writeToFirestore(); renderPool(); }
 }
 
 function renderTrimesterUnits() {
@@ -3323,7 +3357,7 @@ function renderDetailSidebar() {
   const u        = String(detailUnit);
   const unitStds = activeAssignments()[currentGrade][u] || [];
   const unitData = (activeAssessments()[currentGrade] || {})[u] || {};
-  const sjUnitStds = activeSjAssignments()[currentGrade][u] || [];
+  const sjUnitStds = (activeSjAssignments()[currentGrade][u] || []).filter(sid => SJ_IDS.has(sid));
   const sjUnitData = (activeSjAssessments()[currentGrade] || {})[u] || {};
 
   // Collect every assessment row that has BOTH type and date
@@ -3384,8 +3418,8 @@ function buildPerfTaskSection(u) {
     return Array.isArray(rows) && rows.some(r => r.type === 'Performance Task');
   });
 
-  // SJ standards with PT assessments
-  const sjStds  = activeSjAssignments()[currentGrade][u] || [];
+  // SJ standards with PT assessments (only built-in IDs, not custom catch-all items)
+  const sjStds  = (activeSjAssignments()[currentGrade][u] || []).filter(sid => SJ_IDS.has(sid));
   const sjAsmts = activeSjAssessments();
   const sjCrit  = activeSjPtCriteria()[currentGrade][u] || {};
   const ptSjStds = sjStds.filter(sid => {
@@ -3464,7 +3498,8 @@ function addPtCriterion(sid) {
 function renderDetailView() {
   const u      = String(detailUnit);
   const stds   = activeAssignments()[currentGrade][u] || [];
-  const sjStds = activeSjAssignments()[currentGrade][u] || [];
+  // Only show built-in SJ standards in detail screen; custom "catch-all" items (pool-only) are excluded
+  const sjStds = (activeSjAssignments()[currentGrade][u] || []).filter(sid => SJ_IDS.has(sid));
   const lookup = buildLookup(currentGrade);
   const el     = document.getElementById('detailContent');
 
