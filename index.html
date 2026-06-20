@@ -768,6 +768,7 @@
     .theme-tag { background: #DCFCE7; color: #166534; }
     .curr-tag  { background: #FEF3C7; color: #92400E; }
     .sj-tag    { background: #FCE7F3; color: #9D174D; }
+    .hist-tag  { background: #CCFBF1; color: #0F766E; }
 
     /* Group label above SJ standards domain sections */
     .pool-group-label {
@@ -1106,6 +1107,8 @@ const SJ_DOMAINS = {
   ],
 };
 
+const HIST_COLOR = '#0F766E'; // teal-700
+
 // Flat lookup and ID set for SJ standards
 const SJ_LOOKUP = {};
 Object.values(SJ_DOMAINS).forEach(stds => stds.forEach(s => { SJ_LOOKUP[s.id] = s; }));
@@ -1354,6 +1357,20 @@ let trimUnitDetails      = makeDefaultUnitDetails();
 let trimPtCriteria       = makeDefaultPtCriteria();
 let trimSjPtCriteria     = makeDefaultPtCriteria();
 
+/* History Content Standards assignments / assessments / PT criteria */
+let histAssignments    = makeDefaultAssignments();
+let histAssessments    = makeDefaultAssessments();
+let histPtCriteria     = makeDefaultPtCriteria();
+let humHistAssignments = makeDefaultAssignments();
+let humHistAssessments = makeDefaultAssessments();
+let humHistPtCriteria  = makeDefaultPtCriteria();
+let spHistAssignments  = makeDefaultAssignments();
+let spHistAssessments  = makeDefaultAssessments();
+let spHistPtCriteria   = makeDefaultPtCriteria();
+let trimHistAssignments = makeDefaultAssignments();
+let trimHistAssessments = makeDefaultAssessments();
+let trimHistPtCriteria  = makeDefaultPtCriteria();
+
 /* Social Justice Standards assignments / assessments / PT criteria */
 let sjAssignments    = makeDefaultAssignments();
 let sjAssessments    = makeDefaultAssessments();
@@ -1366,7 +1383,7 @@ let spSjAssessments  = makeDefaultAssessments();
 let spSjPtCriteria   = makeDefaultPtCriteria();
 
 /* Custom items added by teachers to each pool */
-let customItems = { texts: [], performanceTasks: [], themes: [], curriculum: [], socialJustice: [] };
+let customItems = { texts: [], performanceTasks: [], themes: [], curriculum: [], socialJustice: [], historyContentStandards: [] };
 
 function makeDefaultAssignments() {
   const a = {};
@@ -1432,6 +1449,15 @@ function makeDefaultUnitDetails() {
 function getAssessmentRows(grade, unit, sid) {
   const u     = String(unit);
   const asmts = activeAssessments();
+  if (!asmts[grade][u])      asmts[grade][u] = {};
+  if (!asmts[grade][u][sid]) asmts[grade][u][sid] = [{ type:'', date:'', description:'' }, { type:'', date:'', description:'' }];
+  return asmts[grade][u][sid];
+}
+
+/* History parallel: uses activeHistAssessments() */
+function getHistAssessmentRows(grade, unit, sid) {
+  const u     = String(unit);
+  const asmts = activeHistAssessments();
   if (!asmts[grade][u])      asmts[grade][u] = {};
   if (!asmts[grade][u][sid]) asmts[grade][u][sid] = [{ type:'', date:'', description:'' }, { type:'', date:'', description:'' }];
   return asmts[grade][u][sid];
@@ -1820,6 +1846,9 @@ function startSync() {
       trimCurrAssignments  = decodePoolAssignments(tri.currAssignments);
       trimSjAssignments    = decodeUnits(tri.sjUnits);
       trimSjAssessments    = decodeAssessments(tri.sjAssessments);
+      trimHistAssignments  = decodeUnits(tri.historyUnits);
+      trimHistAssessments  = decodeAssessments(tri.historyAssessments);
+      trimHistPtCriteria   = decodePtCriteria(tri.historyPtCriteria);
       trimUnitDetails      = decodeUnitDetails(tri.unitDetails);
       trimPtCriteria       = decodePtCriteria(tri.ptCriteria);
       trimSjPtCriteria     = decodePtCriteria(tri.sjPtCriteria);
@@ -1833,6 +1862,16 @@ function startSync() {
       spSjAssignments  = decodeUnits(data.spanishSjUnits);
       spSjAssessments  = decodeAssessments(data.spanishSjAssessments);
       spSjPtCriteria   = decodePtCriteria(data.spanishSjPtCriteria);
+      /* History Content Standards */
+      histAssignments    = decodeUnits(data.historyUnits);
+      histAssessments    = decodeAssessments(data.historyAssessments);
+      histPtCriteria     = decodePtCriteria(data.historyPtCriteria);
+      humHistAssignments = decodeUnits(data.humanitiesHistoryUnits);
+      humHistAssessments = decodeAssessments(data.humanitiesHistoryAssessments);
+      humHistPtCriteria  = decodePtCriteria(data.humanitiesHistoryPtCriteria);
+      spHistAssignments  = decodeUnits(data.spanishHistoryUnits);
+      spHistAssessments  = decodeAssessments(data.spanishHistoryAssessments);
+      spHistPtCriteria   = decodePtCriteria(data.spanishHistoryPtCriteria);
       /* Custom pool items */
       const ci = data.customItems || {};
       customItems = {
@@ -1840,7 +1879,8 @@ function startSync() {
         performanceTasks: Array.isArray(ci.performanceTasks) ? ci.performanceTasks : [],
         themes:           Array.isArray(ci.themes)           ? ci.themes           : [],
         curriculum:       Array.isArray(ci.curriculum)       ? ci.curriculum       : [],
-        socialJustice:    Array.isArray(ci.socialJustice)    ? ci.socialJustice    : [],
+        socialJustice:          Array.isArray(ci.socialJustice)          ? ci.socialJustice          : [],
+        historyContentStandards: Array.isArray(ci.historyContentStandards) ? ci.historyContentStandards : [],
       };
       // Only auto-re-render the main view from snapshots;
       // in detail view we skip re-render to preserve input focus.
@@ -1903,9 +1943,12 @@ async function writeToFirestore() {
         perfAssignments:  encodePoolAssignments(trimPerfAssignments),
         themeAssignments: encodePoolAssignments(trimThemeAssignments),
         currAssignments:  encodePoolAssignments(trimCurrAssignments),
-        sjUnits:          encodeUnits(trimSjAssignments),
-        sjAssessments:    encodeAssessments(trimSjAssessments),
-        unitDetails:      encodeUnitDetails(trimUnitDetails),
+        sjUnits:              encodeUnits(trimSjAssignments),
+        sjAssessments:        encodeAssessments(trimSjAssessments),
+        historyUnits:         encodeUnits(trimHistAssignments),
+        historyAssessments:   encodeAssessments(trimHistAssessments),
+        historyPtCriteria:    encodePtCriteria(trimHistPtCriteria),
+        unitDetails:          encodeUnitDetails(trimUnitDetails),
         ptCriteria:       encodePtCriteria(trimPtCriteria),
         sjPtCriteria:     encodePtCriteria(trimSjPtCriteria),
       },
@@ -1916,16 +1959,27 @@ async function writeToFirestore() {
       humanitiesSjUnits:      encodeUnits(humSjAssignments),
       humanitiesSjAssessments:encodeAssessments(humSjAssessments),
       humanitiesSjPtCriteria: encodePtCriteria(humSjPtCriteria),
-      spanishSjUnits:         encodeUnits(spSjAssignments),
-      spanishSjAssessments:   encodeAssessments(spSjAssessments),
-      spanishSjPtCriteria:    encodePtCriteria(spSjPtCriteria),
+      spanishSjUnits:              encodeUnits(spSjAssignments),
+      spanishSjAssessments:        encodeAssessments(spSjAssessments),
+      spanishSjPtCriteria:         encodePtCriteria(spSjPtCriteria),
+      /* History Content Standards */
+      historyUnits:                encodeUnits(histAssignments),
+      historyAssessments:          encodeAssessments(histAssessments),
+      historyPtCriteria:           encodePtCriteria(histPtCriteria),
+      humanitiesHistoryUnits:      encodeUnits(humHistAssignments),
+      humanitiesHistoryAssessments:encodeAssessments(humHistAssessments),
+      humanitiesHistoryPtCriteria: encodePtCriteria(humHistPtCriteria),
+      spanishHistoryUnits:         encodeUnits(spHistAssignments),
+      spanishHistoryAssessments:   encodeAssessments(spHistAssessments),
+      spanishHistoryPtCriteria:    encodePtCriteria(spHistPtCriteria),
       /* Custom pool items */
       customItems: {
         texts:            customItems.texts,
         performanceTasks: customItems.performanceTasks,
         themes:           customItems.themes,
         curriculum:       customItems.curriculum,
-        socialJustice:    customItems.socialJustice,
+        socialJustice:           customItems.socialJustice,
+        historyContentStandards: customItems.historyContentStandards,
       },
     });
   } catch (err) {
@@ -2005,6 +2059,18 @@ function activeSjAssessments() {
 function activeSjPtCriteria() {
   const t = activeType();
   return t === 'hum' ? humSjPtCriteria : t === 'spa' ? spSjPtCriteria : t === 'tri' ? trimSjPtCriteria : sjPtCriteria;
+}
+function activeHistAssignments() {
+  const t = activeType();
+  return t === 'hum' ? humHistAssignments : t === 'spa' ? spHistAssignments : t === 'tri' ? trimHistAssignments : histAssignments;
+}
+function activeHistAssessments() {
+  const t = activeType();
+  return t === 'hum' ? humHistAssessments : t === 'spa' ? spHistAssessments : t === 'tri' ? trimHistAssessments : histAssessments;
+}
+function activeHistPtCriteria() {
+  const t = activeType();
+  return t === 'hum' ? humHistPtCriteria : t === 'spa' ? spHistPtCriteria : t === 'tri' ? trimHistPtCriteria : histPtCriteria;
 }
 
 /* Toggle between ELA and Humanities unit grids (per grade) */
@@ -2129,6 +2195,77 @@ function updateSjPtCriterion(sid, index, value) {
 function addSjPtCriterion(sid) {
   const u    = String(detailUnit);
   const crit = activeSjPtCriteria()[currentGrade][u];
+  if (!crit[sid]) crit[sid] = [''];
+  if (crit[sid].length < MAX_CRITERIA) {
+    crit[sid].push('');
+    renderPerfTaskSection();
+    writeToFirestore();
+  }
+}
+
+/* =====================================================
+   MUTATIONS — HISTORY CONTENT STANDARDS
+===================================================== */
+function addHistToUnit(sid, unit) {
+  const key  = String(unit);
+  const asgn = activeHistAssignments();
+  if (!asgn[currentGrade][key].includes(sid)) {
+    asgn[currentGrade][key].push(sid);
+    render();
+    writeToFirestore();
+  }
+}
+
+function removeHistFromUnit(sid, unit) {
+  const key  = String(unit);
+  const asgn = activeHistAssignments();
+  const arr  = asgn[currentGrade][key];
+  const i    = arr.indexOf(sid);
+  if (i > -1) { arr.splice(i, 1); render(); writeToFirestore(); }
+}
+
+function updateHistAssessment(sid, rowIndex, field, value) {
+  const rows = getHistAssessmentRows(currentGrade, detailUnit, sid);
+  rows[rowIndex][field] = value;
+  if (field === 'type') {
+    const stillHasPT = rows.some(r => r.type === 'Performance Task');
+    if (!stillHasPT) {
+      const unitCrit = activeHistPtCriteria()[currentGrade][String(detailUnit)];
+      if (unitCrit) delete unitCrit[sid];
+    }
+    renderPerfTaskSection();
+  }
+  renderDetailSidebar();
+  writeToFirestore();
+}
+
+function handleHistDescInput(sid, rowIndex, inputEl) {
+  let val   = inputEl.value;
+  let count = wordCount(val);
+  if (count > MAX_WORDS) {
+    val = val.trim().split(/\s+/).slice(0, MAX_WORDS).join(' ');
+    inputEl.value = val;
+    count = MAX_WORDS;
+  }
+  const counterEl = inputEl.nextElementSibling;
+  if (counterEl) {
+    counterEl.textContent = `${count}/${MAX_WORDS}`;
+    counterEl.className = 'asmt-word-count' + (count >= MAX_WORDS ? ' at-limit' : '');
+  }
+  updateHistAssessment(sid, rowIndex, 'description', val);
+}
+
+function updateHistPtCriterion(sid, index, value) {
+  const u    = String(detailUnit);
+  const crit = activeHistPtCriteria()[currentGrade][u];
+  if (!crit[sid]) crit[sid] = [''];
+  crit[sid][index] = value;
+  writeToFirestore();
+}
+
+function addHistPtCriterion(sid) {
+  const u    = String(detailUnit);
+  const crit = activeHistPtCriteria()[currentGrade][u];
   if (!crit[sid]) crit[sid] = [''];
   if (crit[sid].length < MAX_CRITERIA) {
     crit[sid].push('');
@@ -2689,6 +2826,8 @@ function onDrop(e, unit, el) {
     addPoolItem('curr', payload.slice(12), unit);
   } else if (payload.startsWith('sj::')) {
     addSjToUnit(payload.slice(4), unit);
+  } else if (payload.startsWith('hist::')) {
+    addHistToUnit(payload.slice(6), unit);
   } else {
     addToUnit(payload, unit);
   }
@@ -3036,6 +3175,52 @@ function renderPool() {
       </div>
     </div>`;
 
+  /* ── History Content Standards section ──────────────── */
+  const histAsgn    = activeHistAssignments();
+  const histUnitMap = {};
+  for (let u = 1; u <= 6; u++) {
+    (histAsgn[currentGrade][String(u)] || []).forEach(sid => {
+      if (!histUnitMap[sid]) histUnitMap[sid] = [];
+      histUnitMap[sid].push(u);
+    });
+  }
+
+  const histCards = customItems.historyContentStandards.map(sid => {
+    const units  = histUnitMap[sid] || [];
+    const pips   = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
+    const delBtn = `<button class="pool-custom-delete" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();deleteCustomItem('historyContentStandards','${sid.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">&#215;</button>`;
+    return `
+      <div class="std-card" draggable="true" data-drag-id="hist::${sid}"
+           style="border-left-color:${HIST_COLOR}">
+        <div style="display:flex;align-items:center;gap:4px">
+          <div class="std-card-code" style="color:${HIST_COLOR};flex:1">${sid}</div>
+          ${delBtn}
+        </div>
+        ${units.length ? `<div class="std-card-pips">${pips}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  html += `
+    <div class="pool-group-label">History Content Standards</div>
+    <div class="strand-section">
+      <div class="strand-header" onclick="toggleStrand(this)">
+        <div class="strand-dot" style="background:${HIST_COLOR}"></div>
+        <span class="strand-name" style="color:${HIST_COLOR}">History Content Standards</span>
+        <span class="strand-count">${customItems.historyContentStandards.length}</span>
+        <span class="strand-chevron">&#9662;</span>
+      </div>
+      <div class="strand-cards">
+        ${histCards}
+        <button class="pool-add-btn" id="pool-add-btn-historyContentStandards" onclick="showPoolAddInput('historyContentStandards')">+ Add item</button>
+        <div class="pool-add-row" id="pool-add-row-historyContentStandards">
+          <input class="pool-add-input" id="pool-add-input-historyContentStandards" type="text" placeholder="Standard code or label…"
+                 onkeydown="if(event.key==='Enter')confirmPoolAdd('historyContentStandards');else if(event.key==='Escape')cancelPoolAdd('historyContentStandards')">
+          <button class="pool-add-confirm" onmousedown="event.preventDefault()" onclick="confirmPoolAdd('historyContentStandards')">Add</button>
+          <button class="pool-add-cancel" onmousedown="event.preventDefault()" onclick="cancelPoolAdd('historyContentStandards')">&#215;</button>
+        </div>
+      </div>
+    </div>`;
+
   document.getElementById('poolBody').innerHTML = html;
   document.querySelectorAll('.std-card, .pool-item-card').forEach(c => {
     c.addEventListener('dragstart', onDragStart);
@@ -3068,11 +3253,12 @@ function confirmPoolAdd(poolType) {
   const label = inp.value.trim();
   if (!label) { inp.focus(); return; }
   // Reject duplicates (hardcoded + existing custom)
-  const hardcoded = poolType === 'texts'            ? GENRE_ITEMS
-                  : poolType === 'performanceTasks' ? PERF_ITEMS
-                  : poolType === 'themes'           ? THEME_ITEMS
-                  : poolType === 'socialJustice'    ? [...Object.values(SJ_DOMAINS).flat().map(s => s.id)]
-                  :                                   CURR_ITEMS;
+  const hardcoded = poolType === 'texts'                    ? GENRE_ITEMS
+                  : poolType === 'performanceTasks'         ? PERF_ITEMS
+                  : poolType === 'themes'                   ? THEME_ITEMS
+                  : poolType === 'socialJustice'            ? [...Object.values(SJ_DOMAINS).flat().map(s => s.id)]
+                  : poolType === 'historyContentStandards'  ? []   // no built-ins; only check existing custom items
+                  :                                           CURR_ITEMS;
   const existing = [...hardcoded, ...customItems[poolType]];
   if (existing.includes(label)) { inp.select(); return; }
   customItems[poolType].push(label);
@@ -3097,6 +3283,7 @@ function renderTrimesterUnits() {
   const themeA = activeThemeAssignments();
   const currA  = activeCurrAssignments();
   const sjA    = activeSjAssignments();
+  const histA  = activeHistAssignments();
 
   let html = '';
   for (let u = 1; u <= 3; u++) {
@@ -3107,7 +3294,8 @@ function renderTrimesterUnits() {
     const themeItems = themeA[currentGrade][uKey] || [];
     const currItems  = currA[currentGrade][uKey]  || [];
     const sjItems    = sjA[currentGrade][uKey]    || [];
-    const totalItems = stds.length + genreItems.length + perfItems.length + themeItems.length + currItems.length + sjItems.length;
+    const histItems  = histA[currentGrade][uKey]  || [];
+    const totalItems = stds.length + genreItems.length + perfItems.length + themeItems.length + currItems.length + sjItems.length + histItems.length;
 
     const stdHtml = stds.map(sid => {
       const s = lookup[sid];
@@ -3175,6 +3363,16 @@ function renderTrimesterUnits() {
                 onclick="removeSjFromUnit('${sid}',${u})">&#215;</button>
       </div>`).join('');
 
+    const histHtml = histItems.map(sid => `
+      <div class="unit-std-item">
+        <div class="unit-std-info">
+          <span class="pool-tag hist-tag">Hist</span>
+          <div class="unit-std-code" style="margin-top:3px;color:${HIST_COLOR}">${sid}</div>
+        </div>
+        <button class="unit-std-remove" title="Remove"
+                onclick="removeHistFromUnit('${sid}',${u})">&#215;</button>
+      </div>`).join('');
+
     html += `
       <div class="unit-col unit--${u} tri"
            ondragover="onDragOver(event,this)"
@@ -3189,7 +3387,7 @@ function renderTrimesterUnits() {
           <span class="unit-open-hint" title="Double-click to open detail">&#8599;</span>
         </div>
         <div class="unit-drop-zone">
-          ${totalItems ? (themeHtml + currHtml + genreHtml + perfHtml + sjHtml + stdHtml) : '<div class="unit-empty">Drop content here</div>'}
+          ${totalItems ? (themeHtml + currHtml + genreHtml + perfHtml + sjHtml + histHtml + stdHtml) : '<div class="unit-empty">Drop content here</div>'}
         </div>
       </div>`;
   }
@@ -3208,6 +3406,7 @@ function renderUnits() {
   const themeA  = activeThemeAssignments();
   const currA   = activeCurrAssignments();
   const sjA     = activeSjAssignments();
+  const histA   = activeHistAssignments();
 
   let html = '';
   for (let u = 1; u <= 6; u++) {
@@ -3218,7 +3417,8 @@ function renderUnits() {
     const themeItems = themeA[currentGrade][uKey] || [];
     const currItems  = currA[currentGrade][uKey]  || [];
     const sjItems    = sjA[currentGrade][uKey]    || [];
-    const totalItems = stds.length + genreItems.length + perfItems.length + themeItems.length + currItems.length + sjItems.length;
+    const histItems  = histA[currentGrade][uKey]  || [];
+    const totalItems = stds.length + genreItems.length + perfItems.length + themeItems.length + currItems.length + sjItems.length + histItems.length;
 
     const titlePrefix = isHumanities ? 'Humanities ' : isSpanish ? 'Spanish ' : 'ELA ';
     const chip        = isHumanities ? '<span class="hum-chip">H</span>'
@@ -3291,6 +3491,16 @@ function renderUnits() {
                 onclick="removeSjFromUnit('${sid}',${u})">&#215;</button>
       </div>`).join('');
 
+    const histHtml = histItems.map(sid => `
+      <div class="unit-std-item">
+        <div class="unit-std-info">
+          <span class="pool-tag hist-tag">Hist</span>
+          <div class="unit-std-code" style="margin-top:3px;color:${HIST_COLOR}">${sid}</div>
+        </div>
+        <button class="unit-std-remove" title="Remove"
+                onclick="removeHistFromUnit('${sid}',${u})">&#215;</button>
+      </div>`).join('');
+
     html += `
       <div class="unit-col unit--${u}${isHumanities?' hum':''}${isSpanish?' spa':''}"
            ondragover="onDragOver(event,this)"
@@ -3305,7 +3515,7 @@ function renderUnits() {
           <span class="unit-open-hint" title="Double-click to open detail">&#8599;</span>
         </div>
         <div class="unit-drop-zone">
-          ${totalItems ? (themeHtml + currHtml + genreHtml + perfHtml + sjHtml + stdHtml) : '<div class="unit-empty">Drop content here</div>'}
+          ${totalItems ? (themeHtml + currHtml + genreHtml + perfHtml + sjHtml + histHtml + stdHtml) : '<div class="unit-empty">Drop content here</div>'}
         </div>
       </div>`;
   }
@@ -3359,6 +3569,8 @@ function renderDetailSidebar() {
   const unitData = (activeAssessments()[currentGrade] || {})[u] || {};
   const sjUnitStds = (activeSjAssignments()[currentGrade][u] || []).filter(sid => SJ_IDS.has(sid));
   const sjUnitData = (activeSjAssessments()[currentGrade] || {})[u] || {};
+  const histUnitStds = activeHistAssignments()[currentGrade][u] || [];
+  const histUnitData = (activeHistAssessments()[currentGrade] || {})[u] || {};
 
   // Collect every assessment row that has BOTH type and date
   const scheduled = [];
@@ -3369,6 +3581,11 @@ function renderDetailSidebar() {
   });
   sjUnitStds.forEach(sid => {
     (sjUnitData[sid] || []).forEach((row, i) => {
+      if (row.type && row.date) scheduled.push({ sid, rowIndex: i, type: row.type, date: row.date, description: row.description || '' });
+    });
+  });
+  histUnitStds.forEach(sid => {
+    (histUnitData[sid] || []).forEach((row, i) => {
       if (row.type && row.date) scheduled.push({ sid, rowIndex: i, type: row.type, date: row.date, description: row.description || '' });
     });
   });
@@ -3427,9 +3644,18 @@ function buildPerfTaskSection(u) {
     return Array.isArray(rows) && rows.some(r => r.type === 'Performance Task');
   });
 
+  // History standards with PT assessments
+  const histStds  = activeHistAssignments()[currentGrade][u] || [];
+  const histAsmts = activeHistAssessments();
+  const histCrit  = activeHistPtCriteria()[currentGrade][u] || {};
+  const ptHistStds = histStds.filter(sid => {
+    const rows = ((histAsmts[currentGrade] || {})[u] || {})[sid];
+    return Array.isArray(rows) && rows.some(r => r.type === 'Performance Task');
+  });
+
   const header = `<div class="pool-section-hdr">Performance Tasks</div>`;
 
-  if (ptStds.length === 0 && ptSjStds.length === 0) {
+  if (ptStds.length === 0 && ptSjStds.length === 0 && ptHistStds.length === 0) {
     return `${header}<div class="pt-empty">No Performance Task assessments assigned yet</div>`;
   }
 
@@ -3465,7 +3691,12 @@ function buildPerfTaskSection(u) {
     return buildCard(sid, criteria, SJ_COLOR, 'updateSjPtCriterion', 'addSjPtCriterion');
   }).join('');
 
-  return `${header}${ccssCards}${sjCards}`;
+  const histCards = ptHistStds.map(sid => {
+    const criteria = (histCrit[sid] && histCrit[sid].length > 0) ? histCrit[sid] : [''];
+    return buildCard(sid, criteria, HIST_COLOR, 'updateHistPtCriterion', 'addHistPtCriterion');
+  }).join('');
+
+  return `${header}${ccssCards}${sjCards}${histCards}`;
 }
 
 function renderPerfTaskSection() {
@@ -3496,11 +3727,12 @@ function addPtCriterion(sid) {
    RENDER — UNIT DETAIL VIEW
 ===================================================== */
 function renderDetailView() {
-  const u      = String(detailUnit);
-  const stds   = activeAssignments()[currentGrade][u] || [];
+  const u        = String(detailUnit);
+  const stds     = activeAssignments()[currentGrade][u] || [];
   // Only show built-in SJ standards in detail screen; custom "catch-all" items (pool-only) are excluded
-  const sjStds = (activeSjAssignments()[currentGrade][u] || []).filter(sid => SJ_IDS.has(sid));
-  const lookup = buildLookup(currentGrade);
+  const sjStds   = (activeSjAssignments()[currentGrade][u] || []).filter(sid => SJ_IDS.has(sid));
+  const histStds = activeHistAssignments()[currentGrade][u] || [];
+  const lookup   = buildLookup(currentGrade);
   const el     = document.getElementById('detailContent');
 
   /* ── Always render EU / EQ + Themes at the top ──────── */
@@ -3509,7 +3741,7 @@ function renderDetailView() {
   /* ── Bottom: standards + always-on PT section ────────── */
   let bottomHtml = '';
 
-  const hasAnyContent = stds.length > 0 || sjStds.length > 0;
+  const hasAnyContent = stds.length > 0 || sjStds.length > 0 || histStds.length > 0;
   if (!hasAnyContent) {
     bottomHtml = `<div class="detail-empty" style="padding:40px 20px">No content assigned yet.<br>
       <span style="font-size:.8rem;color:var(--text-light);margin-top:6px;display:block">
@@ -3604,6 +3836,50 @@ function renderDetailView() {
           <div class="std-detail-card" style="border-left-color:${SJ_COLOR}">
             <div class="std-detail-code" style="color:${SJ_COLOR}">${std.id}</div>
             ${std.desc ? `<div class="std-detail-desc">${std.desc}</div>` : ''}
+            <hr class="asmt-divider">
+            <div class="asmt-rows">${asmtRows}</div>
+          </div>`;
+      }).join('');
+    }
+
+    /* ── History Content Standards cards ─────────────────── */
+    if (histStds.length > 0) {
+      bottomHtml += `<div class="pool-section-hdr">History Content Standards</div>`;
+      bottomHtml += histStds.map(sid => {
+        const rows = getHistAssessmentRows(currentGrade, detailUnit, sid);
+
+        const asmtRows = [0, 1].map(i => {
+          const row  = rows[i] || { type:'', date:'', description:'' };
+          const desc = row.description || '';
+          const wc   = wordCount(desc);
+          return `
+            <div class="asmt-row">
+              <div class="asmt-row-top">
+                <span class="asmt-label">Assessment ${i + 1}</span>
+                <select class="asmt-select"
+                        onchange="updateHistAssessment('${sid}',${i},'type',this.value)">
+                  <option value=""                 ${row.type===''                 ?'selected':''}>&#8212; select type &#8212;</option>
+                  <option value="Quiz"             ${row.type==='Quiz'             ?'selected':''}>Quiz</option>
+                  <option value="Writing Task"     ${row.type==='Writing Task'     ?'selected':''}>Writing Task</option>
+                  <option value="Project"          ${row.type==='Project'          ?'selected':''}>Project</option>
+                  <option value="Final Assessment" ${row.type==='Final Assessment' ?'selected':''}>Final Assessment</option>
+                  <option value="Performance Task" ${row.type==='Performance Task' ?'selected':''}>Performance Task</option>
+                </select>
+                <input type="date" class="asmt-date" value="${row.date || ''}"
+                       onchange="updateHistAssessment('${sid}',${i},'date',this.value)">
+              </div>
+              <div class="asmt-row-bottom">
+                <input type="text" class="asmt-desc" placeholder="Brief description..."
+                       value="${desc.replace(/"/g, '&quot;')}"
+                       oninput="handleHistDescInput('${sid}',${i},this)">
+                <span class="asmt-word-count${wc >= MAX_WORDS ? ' at-limit' : ''}">${wc}/${MAX_WORDS}</span>
+              </div>
+            </div>`;
+        }).join('');
+
+        return `
+          <div class="std-detail-card" style="border-left-color:${HIST_COLOR}">
+            <div class="std-detail-code" style="color:${HIST_COLOR}">${sid}</div>
             <hr class="asmt-divider">
             <div class="asmt-rows">${asmtRows}</div>
           </div>`;
