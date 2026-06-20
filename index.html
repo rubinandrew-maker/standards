@@ -398,6 +398,78 @@
       flex-shrink: 0; line-height: 1.5;
     }
 
+    /* ── TRIMESTER DETAIL VIEW ──────────────────────────── */
+    .trim-detail-view {
+      flex: 1;
+      overflow-y: auto;
+      background: var(--bg);
+      padding: 28px 32px 56px;
+    }
+    .trim-detail-inner {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    .trd-section {
+      margin-bottom: 40px;
+      padding-bottom: 40px;
+      border-bottom: 1px solid var(--border);
+    }
+    .trd-section:last-child { border-bottom: none; margin-bottom: 0; }
+    .trd-section-hdr {
+      font: 600 1rem 'Inter', sans-serif;
+      color: var(--text);
+      margin-bottom: 14px;
+      letter-spacing: .01em;
+    }
+    .trd-textarea {
+      width: 100%;
+      min-height: 140px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font: 400 .95rem 'Inter', sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      resize: vertical;
+      line-height: 1.65;
+      box-sizing: border-box;
+    }
+    .trd-textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+    .trd-publish-btn {
+      margin-top: 10px;
+      padding: 5px 16px;
+      background: var(--accent);
+      border: none;
+      border-radius: 4px;
+      color: #fff;
+      font: 600 .78rem 'Inter', sans-serif;
+      cursor: pointer;
+      transition: opacity .14s;
+      display: block;
+    }
+    .trd-publish-btn:hover { opacity: .87; }
+    .trd-published-wrap { position: relative; }
+    .trd-published-text {
+      font-size: .98rem;
+      line-height: 1.75;
+      color: var(--text);
+    }
+    .trd-edit-btn {
+      position: absolute;
+      top: -2px; right: -2px;
+      background: none;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      color: var(--text-light);
+      cursor: pointer;
+      font: 500 .68rem 'Inter', sans-serif;
+      padding: 3px 7px;
+      opacity: 0;
+      transition: opacity .15s, background .12s, border-color .12s;
+    }
+    .trd-published-wrap:hover .trd-edit-btn { opacity: 1; }
+    .trd-edit-btn:hover { background: #F0EDE8; border-color: var(--border); color: var(--text-sec); }
+
     /* ── DETAIL VIEW ─────────────────────────────────────── */
     .detail-view {
       flex: 1;
@@ -1028,6 +1100,11 @@
   </aside>
 </div>
 
+<!-- ═══ TRIMESTER DETAIL VIEW ═══════════════════════════ -->
+<div id="trimDetailView" class="trim-detail-view" style="display:none">
+  <div class="trim-detail-inner" id="trimDetailContent"></div>
+</div>
+
 <script>
 /* =====================================================
    FIREBASE CONFIG — replace with your project credentials
@@ -1384,6 +1461,34 @@ let spSjPtCriteria   = makeDefaultPtCriteria();
 
 /* Custom items added by teachers to each pool */
 let customItems = { texts: [], performanceTasks: [], themes: [], curriculum: [], socialJustice: [], historyContentStandards: [] };
+
+/* Trimester detail sections (5 independent publish/edit fields) */
+const TRI_SECTIONS = [
+  { key: 'overview',                 label: 'Overview' },
+  { key: 'collectivePerformanceTask',label: 'Collective Performance Task' },
+  { key: 'elaConnection',            label: 'ELA Connection' },
+  { key: 'ssConnection',             label: 'SS Connection' },
+  { key: 'spanishConnection',        label: 'Spanish Connection' },
+];
+
+function makeDefaultTrimesterDetails() {
+  const td = {};
+  ['6','7','8'].forEach(g => {
+    td[g] = {};
+    ['1','2','3'].forEach(u => {
+      td[g][u] = {
+        overview: '', overviewPublished: false,
+        collectivePerformanceTask: '', collectivePerformanceTaskPublished: false,
+        elaConnection: '', elaConnectionPublished: false,
+        ssConnection: '', ssConnectionPublished: false,
+        spanishConnection: '', spanishConnectionPublished: false,
+      };
+    });
+  });
+  return td;
+}
+
+let trimesterDetails = makeDefaultTrimesterDetails();
 
 function makeDefaultAssignments() {
   const a = {};
@@ -1782,6 +1887,43 @@ function decodeAssessments(data) {
   return a;
 }
 
+/* Encode / decode trimester detail content (plain nested object, no key transformation needed) */
+function encodeTrimesterDetails(td) {
+  const result = {};
+  ['6','7','8'].forEach(g => {
+    result[g] = {};
+    ['1','2','3'].forEach(u => {
+      result[g][u] = Object.assign({}, (td[g] || {})[u] || {});
+    });
+  });
+  return result;
+}
+
+function decodeTrimesterDetails(data) {
+  const td = makeDefaultTrimesterDetails();
+  if (!data) return td;
+  ['6','7','8'].forEach(g => {
+    if (!data[g]) return;
+    ['1','2','3'].forEach(u => {
+      if (!data[g][u]) return;
+      const d = data[g][u];
+      td[g][u] = {
+        overview:                              d.overview || '',
+        overviewPublished:                     !!d.overviewPublished,
+        collectivePerformanceTask:             d.collectivePerformanceTask || '',
+        collectivePerformanceTaskPublished:    !!d.collectivePerformanceTaskPublished,
+        elaConnection:                         d.elaConnection || '',
+        elaConnectionPublished:                !!d.elaConnectionPublished,
+        ssConnection:                          d.ssConnection || '',
+        ssConnectionPublished:                 !!d.ssConnectionPublished,
+        spanishConnection:                     d.spanishConnection || '',
+        spanishConnectionPublished:            !!d.spanishConnectionPublished,
+      };
+    });
+  });
+  return td;
+}
+
 /* =====================================================
    FIRESTORE — READ / WRITE
 ===================================================== */
@@ -1882,6 +2024,8 @@ function startSync() {
         socialJustice:          Array.isArray(ci.socialJustice)          ? ci.socialJustice          : [],
         historyContentStandards: Array.isArray(ci.historyContentStandards) ? ci.historyContentStandards : [],
       };
+      /* Trimester detail content */
+      trimesterDetails = decodeTrimesterDetails(data.trimesterDetails);
       // Only auto-re-render the main view from snapshots;
       // in detail view we skip re-render to preserve input focus.
       if (currentView === 'main') render();
@@ -1981,6 +2125,8 @@ async function writeToFirestore() {
         socialJustice:           customItems.socialJustice,
         historyContentStandards: customItems.historyContentStandards,
       },
+      /* Trimester detail content */
+      trimesterDetails: encodeTrimesterDetails(trimesterDetails),
     });
   } catch (err) {
     console.error('Firestore write error:', err);
@@ -2720,6 +2866,64 @@ function updateAssessment(sid, rowIndex, field, value) {
 }
 
 /* =====================================================
+   TRIMESTER DETAIL — RENDER / MUTATE
+===================================================== */
+function renderTrimesterDetailView() {
+  const u   = String(detailUnit);
+  const trd = (trimesterDetails[currentGrade] || {})[u] || {};
+  document.getElementById('trimDetailContent').innerHTML =
+    TRI_SECTIONS.map(s => buildTrimDetailSection(s.key, s.label, trd)).join('');
+}
+
+function buildTrimDetailSection(key, label, trd) {
+  const text      = trd[key] || '';
+  const published = !!(trd[key + 'Published']) && text.trim() !== '';
+  if (published) {
+    const safeHtml = text
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br>');
+    return `
+      <div class="trd-section">
+        <div class="trd-section-hdr">${label}</div>
+        <div class="trd-published-wrap">
+          <div class="trd-published-text">${safeHtml}</div>
+          <button class="trd-edit-btn" onclick="editTrimSection('${key}')" title="Edit">&#9998; Edit</button>
+        </div>
+      </div>`;
+  } else {
+    const escaped = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return `
+      <div class="trd-section">
+        <div class="trd-section-hdr">${label}</div>
+        <textarea class="trd-textarea" id="trd-${key}" placeholder="Write here…">${escaped}</textarea>
+        <button class="trd-publish-btn" onclick="publishTrimSection('${key}')">Publish</button>
+      </div>`;
+  }
+}
+
+function publishTrimSection(key) {
+  const ta = document.getElementById(`trd-${key}`);
+  if (!ta) return;
+  const text = ta.value;
+  const u    = String(detailUnit);
+  if (!trimesterDetails[currentGrade])    trimesterDetails[currentGrade]    = {};
+  if (!trimesterDetails[currentGrade][u]) trimesterDetails[currentGrade][u] = {};
+  const trd           = trimesterDetails[currentGrade][u];
+  trd[key]            = text;
+  trd[key + 'Published'] = text.trim() !== '';
+  renderTrimesterDetailView();
+  writeToFirestore();
+}
+
+function editTrimSection(key) {
+  const u = String(detailUnit);
+  if (!trimesterDetails[currentGrade])    trimesterDetails[currentGrade]    = {};
+  if (!trimesterDetails[currentGrade][u]) trimesterDetails[currentGrade][u] = {};
+  trimesterDetails[currentGrade][u][key + 'Published'] = false;
+  renderTrimesterDetailView();
+}
+
+/* =====================================================
    VIEW MANAGEMENT
 ===================================================== */
 function openUnitDetail(unit, evt, unitType) {
@@ -2729,21 +2933,29 @@ function openUnitDetail(unit, evt, unitType) {
   detailUnitType = unitType || currentUnitType[currentGrade];
   currentView    = 'unit';
   const typeLabel = detailUnitType === 'hum' ? 'Humanities ' : detailUnitType === 'spa' ? 'Spanish ' : detailUnitType === 'tri' ? 'Trimester ' : 'ELA ';
-  document.getElementById('mainCtrl').style.display   = 'none';
-  document.getElementById('detailCtrl').style.display  = 'flex';
-  document.getElementById('detailTitle').textContent   = `Grade ${currentGrade} — ${typeLabel}${unit}`;
-  document.getElementById('mainView').style.display    = 'none';
-  document.getElementById('detailView').style.display  = 'flex';
-  renderDetailView();
+  document.getElementById('mainCtrl').style.display      = 'none';
+  document.getElementById('detailCtrl').style.display    = 'flex';
+  document.getElementById('detailTitle').textContent     = `Grade ${currentGrade} — ${typeLabel}${unit}`;
+  document.getElementById('mainView').style.display      = 'none';
+  if (detailUnitType === 'tri') {
+    document.getElementById('detailView').style.display    = 'none';
+    document.getElementById('trimDetailView').style.display = 'block';
+    renderTrimesterDetailView();
+  } else {
+    document.getElementById('detailView').style.display    = 'flex';
+    document.getElementById('trimDetailView').style.display = 'none';
+    renderDetailView();
+  }
 }
 
 function closeUnitDetail() {
   currentView = 'main';
   detailUnit  = null;
-  document.getElementById('mainCtrl').style.display   = 'flex';
-  document.getElementById('detailCtrl').style.display  = 'none';
-  document.getElementById('mainView').style.display    = 'flex';
-  document.getElementById('detailView').style.display  = 'none';
+  document.getElementById('mainCtrl').style.display      = 'flex';
+  document.getElementById('detailCtrl').style.display    = 'none';
+  document.getElementById('mainView').style.display      = 'flex';
+  document.getElementById('detailView').style.display    = 'none';
+  document.getElementById('trimDetailView').style.display = 'none';
   render();
 }
 
