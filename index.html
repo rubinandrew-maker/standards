@@ -1462,6 +1462,9 @@ let spSjPtCriteria   = makeDefaultPtCriteria();
 /* Custom items added by teachers to each pool */
 let customItems = { texts: [], performanceTasks: [], themes: [], curriculum: [], socialJustice: [], historyContentStandards: [] };
 
+/* Hardcoded items deleted by teachers — suppressed from pool for all users */
+let deletedItems = { texts: [], themes: [], curriculum: [] };
+
 /* Trimester detail sections (5 independent publish/edit fields) */
 const TRI_SECTIONS = [
   { key: 'overview',                 label: 'Overview' },
@@ -2026,6 +2029,13 @@ function startSync() {
       };
       /* Trimester detail content */
       trimesterDetails = decodeTrimesterDetails(data.trimesterDetails);
+      /* Deleted hardcoded pool items */
+      const di = data.deletedItems || {};
+      deletedItems = {
+        texts:      Array.isArray(di.texts)      ? di.texts      : [],
+        themes:     Array.isArray(di.themes)     ? di.themes     : [],
+        curriculum: Array.isArray(di.curriculum) ? di.curriculum : [],
+      };
       // Only auto-re-render the main view from snapshots;
       // in detail view we skip re-render to preserve input focus.
       if (currentView === 'main') render();
@@ -2127,6 +2137,12 @@ async function writeToFirestore() {
       },
       /* Trimester detail content */
       trimesterDetails: encodeTrimesterDetails(trimesterDetails),
+      /* Deleted hardcoded pool items */
+      deletedItems: {
+        texts:      deletedItems.texts,
+        themes:     deletedItems.themes,
+        curriculum: deletedItems.curriculum,
+      },
     });
   } catch (err) {
     console.error('Firestore write error:', err);
@@ -3136,12 +3152,15 @@ function renderPool() {
       genreUnitMap[label].push(u);
     });
   }
-  const allGenreItems = [...GENRE_ITEMS, ...customItems.texts];
+  const allGenreItems = [...GENRE_ITEMS.filter(l => !deletedItems.texts.includes(l)), ...customItems.texts];
   const genreCards = allGenreItems.map(label => {
     const units   = genreUnitMap[label] || [];
     const pips    = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
     const isCustom = customItems.texts.includes(label);
-    const delBtn  = isCustom ? `<button class="pool-custom-delete" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();deleteCustomItem('texts','${label.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">&#215;</button>` : '';
+    const safeLbl  = label.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const delBtn  = isCustom
+      ? `<button class="pool-custom-delete" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();deleteCustomItem('texts','${safeLbl}')">&#215;</button>`
+      : `<button class="pool-custom-delete" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();deleteHardcodedItem('texts','${safeLbl}')">&#215;</button>`;
     return `
       <div class="pool-item-card" draggable="true" data-drag-id="genre::${label}"
            style="border-left-color:${GENRE_COLOR}">
@@ -3230,12 +3249,15 @@ function renderPool() {
       themeUnitMap[label].push(u);
     });
   }
-  const allThemeItems = [...THEME_ITEMS, ...customItems.themes];
+  const allThemeItems = [...THEME_ITEMS.filter(l => !deletedItems.themes.includes(l)), ...customItems.themes];
   const themeCards = allThemeItems.map(label => {
     const units    = themeUnitMap[label] || [];
     const pips     = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
     const isCustom = customItems.themes.includes(label);
-    const delBtn   = isCustom ? `<button class="pool-custom-delete" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();deleteCustomItem('themes','${label.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">&#215;</button>` : '';
+    const safeLbl  = label.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const delBtn   = isCustom
+      ? `<button class="pool-custom-delete" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();deleteCustomItem('themes','${safeLbl}')">&#215;</button>`
+      : `<button class="pool-custom-delete" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();deleteHardcodedItem('themes','${safeLbl}')">&#215;</button>`;
     return `
       <div class="pool-item-card" draggable="true" data-drag-id="theme::${label}"
            style="border-left-color:${THEME_COLOR}">
@@ -3277,12 +3299,15 @@ function renderPool() {
       currUnitMap[label].push(u);
     });
   }
-  const allCurrItems = [...CURR_ITEMS, ...customItems.curriculum];
+  const allCurrItems = [...CURR_ITEMS.filter(l => !deletedItems.curriculum.includes(l)), ...customItems.curriculum];
   const currCards = allCurrItems.map(label => {
     const units    = currUnitMap[label] || [];
     const pips     = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
     const isCustom = customItems.curriculum.includes(label);
-    const delBtn   = isCustom ? `<button class="pool-custom-delete" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();deleteCustomItem('curriculum','${label.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">&#215;</button>` : '';
+    const safeLbl  = label.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const delBtn   = isCustom
+      ? `<button class="pool-custom-delete" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();deleteCustomItem('curriculum','${safeLbl}')">&#215;</button>`
+      : `<button class="pool-custom-delete" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();deleteHardcodedItem('curriculum','${safeLbl}')">&#215;</button>`;
     return `
       <div class="pool-item-card" draggable="true" data-drag-id="curriculum::${label}"
            style="border-left-color:${CURR_COLOR}">
@@ -3483,6 +3508,16 @@ function deleteCustomItem(poolType, label) {
   const arr = customItems[poolType];
   const i   = arr.indexOf(label);
   if (i > -1) { arr.splice(i, 1); writeToFirestore(); renderPool(); }
+}
+
+function deleteHardcodedItem(poolType, label) {
+  if (!confirm(`Remove "${label}" from the pool for all users? It will stay in any unit columns where it was already placed.`)) return;
+  if (!deletedItems[poolType]) deletedItems[poolType] = [];
+  if (!deletedItems[poolType].includes(label)) {
+    deletedItems[poolType].push(label);
+    writeToFirestore();
+    renderPool();
+  }
 }
 
 function renderTrimesterUnits() {
