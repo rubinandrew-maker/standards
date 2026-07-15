@@ -850,6 +850,8 @@
     .curr-tag  { background: #FEF3C7; color: #92400E; }
     .sj-tag    { background: #FCE7F3; color: #9D174D; }
     .hist-tag  { background: #CCFBF1; color: #0F766E; }
+    .va-tag    { background: #FEE2E2; color: #B91C1C; }
+    .mu-tag    { background: #E0E7FF; color: #3730A3; }
 
     /* Group label above SJ standards domain sections */
     .pool-group-label {
@@ -1195,6 +1197,40 @@ const SJ_DOMAINS = {
 
 const HIST_COLOR = '#0F766E'; // teal-700
 
+const VA_COLOR = '#DC2626'; // red-600
+const MU_COLOR = '#4338CA'; // indigo-700
+
+const VA_STANDARDS = [
+  { id: 'VA:Cr1',  desc: 'Generate and conceptualize artistic ideas and work' },
+  { id: 'VA:Cr2',  desc: 'Organize and develop artistic ideas and work' },
+  { id: 'VA:Cr3',  desc: 'Refine and complete artistic work' },
+  { id: 'VA:Pr4',  desc: 'Select, analyze, and interpret artistic work for presentation' },
+  { id: 'VA:Pr5',  desc: 'Develop and refine artistic techniques and work for presentation' },
+  { id: 'VA:Pr6',  desc: 'Convey meaning through the presentation of artistic work' },
+  { id: 'VA:Re7',  desc: 'Perceive and analyze artistic work' },
+  { id: 'VA:Re8',  desc: 'Interpret intent and meaning in artistic work' },
+  { id: 'VA:Re9',  desc: 'Apply criteria to evaluate artistic work' },
+  { id: 'VA:Cn10', desc: 'Synthesize and relate knowledge and personal experiences to make art' },
+  { id: 'VA:Cn11', desc: 'Relate artistic ideas and works with societal, cultural, and historical context to deepen understanding' },
+];
+
+const MU_STANDARDS = [
+  { id: 'MU:Cr1',  desc: 'Generate and conceptualize artistic ideas and work' },
+  { id: 'MU:Cr2',  desc: 'Organize and develop artistic ideas and work' },
+  { id: 'MU:Cr3',  desc: 'Refine and complete artistic work' },
+  { id: 'MU:Pr4',  desc: 'Select, analyze, and interpret artistic work for presentation' },
+  { id: 'MU:Pr5',  desc: 'Develop and refine artistic techniques and work for presentation' },
+  { id: 'MU:Pr6',  desc: 'Convey meaning through the presentation of artistic work' },
+  { id: 'MU:Re7',  desc: 'Perceive and analyze artistic work' },
+  { id: 'MU:Re8',  desc: 'Interpret intent and meaning in artistic work' },
+  { id: 'MU:Re9',  desc: 'Apply criteria to evaluate artistic work' },
+  { id: 'MU:Cn10', desc: 'Synthesize and relate knowledge and personal experiences to make art' },
+  { id: 'MU:Cn11', desc: 'Relate artistic ideas and works with societal, cultural, and historical context to deepen understanding' },
+];
+
+const VA_IDS = new Set(VA_STANDARDS.map(s => s.id));
+const MU_IDS = new Set(MU_STANDARDS.map(s => s.id));
+
 // Flat lookup and ID set for SJ standards
 const SJ_LOOKUP = {};
 Object.values(SJ_DOMAINS).forEach(stds => stds.forEach(s => { SJ_LOOKUP[s.id] = s; }));
@@ -1489,8 +1525,16 @@ let spSjAssignments  = makeDefaultAssignments();
 let spSjAssessments  = makeDefaultAssessments();
 let spSjPtCriteria   = makeDefaultPtCriteria();
 
+/* ── Visual Arts / Music (Art/Music tab only) ────────── */
+let artVaAssignments = makeDefaultAssignments();
+let artVaAssessments = makeDefaultAssessments();
+let artVaPtCriteria  = makeDefaultPtCriteria();
+let artMuAssignments = makeDefaultAssignments();
+let artMuAssessments = makeDefaultAssessments();
+let artMuPtCriteria  = makeDefaultPtCriteria();
+
 /* Custom items added by teachers to each pool */
-let customItems = { texts: [], performanceTasks: [], themes: [], curriculum: [], socialJustice: [], historyContentStandards: [] };
+let customItems = { texts: [], performanceTasks: [], themes: [], curriculum: [], socialJustice: [], historyContentStandards: [], visualArts: [], music: [] };
 
 /* Hardcoded items deleted by teachers — suppressed from pool for all users */
 let deletedItems = { texts: [], themes: [], curriculum: [] };
@@ -2056,6 +2100,8 @@ function startSync() {
         curriculum:       Array.isArray(ci.curriculum)       ? ci.curriculum       : [],
         socialJustice:          Array.isArray(ci.socialJustice)          ? ci.socialJustice          : [],
         historyContentStandards: Array.isArray(ci.historyContentStandards) ? ci.historyContentStandards : [],
+        visualArts: Array.isArray(ci.visualArts) ? ci.visualArts : [],
+        music:      Array.isArray(ci.music)      ? ci.music      : [],
       };
       /* Art/Music */
       const am = data.artMusic || {};
@@ -2077,6 +2123,12 @@ function startSync() {
       artHistAssignments  = decodeUnits(am.historyUnits);
       artHistAssessments  = decodeAssessments(am.historyAssessments);
       artHistPtCriteria   = decodePtCriteria(am.historyPtCriteria);
+      artVaAssignments    = decodeUnits(am.vaUnits);
+      artVaAssessments    = decodeAssessments(am.vaAssessments);
+      artVaPtCriteria     = decodePtCriteria(am.vaPtCriteria);
+      artMuAssignments    = decodeUnits(am.muUnits);
+      artMuAssessments    = decodeAssessments(am.muAssessments);
+      artMuPtCriteria     = decodePtCriteria(am.muPtCriteria);
       /* Trimester detail content */
       trimesterDetails = decodeTrimesterDetails(data.trimesterDetails);
       /* Deleted hardcoded pool items */
@@ -2196,6 +2248,12 @@ async function writeToFirestore() {
         historyUnits:     encodeUnits(artHistAssignments),
         historyAssessments: encodeAssessments(artHistAssessments),
         historyPtCriteria:  encodePtCriteria(artHistPtCriteria),
+        vaUnits:          encodeUnits(artVaAssignments),
+        vaAssessments:    encodeAssessments(artVaAssessments),
+        vaPtCriteria:     encodePtCriteria(artVaPtCriteria),
+        muUnits:          encodeUnits(artMuAssignments),
+        muAssessments:    encodeAssessments(artMuAssessments),
+        muPtCriteria:     encodePtCriteria(artMuPtCriteria),
       },
       /* Custom pool items */
       customItems: {
@@ -2205,6 +2263,8 @@ async function writeToFirestore() {
         curriculum:       customItems.curriculum,
         socialJustice:           customItems.socialJustice,
         historyContentStandards: customItems.historyContentStandards,
+        visualArts: customItems.visualArts,
+        music:      customItems.music,
       },
       /* Trimester detail content */
       trimesterDetails: encodeTrimesterDetails(trimesterDetails),
@@ -2505,6 +2565,110 @@ function addHistPtCriterion(sid) {
     renderPerfTaskSection();
     writeToFirestore();
   }
+}
+
+/* =====================================================
+   MUTATIONS — VISUAL ARTS / MUSIC (Art/Music tab)
+===================================================== */
+function getVaAssessmentRows(grade, unit, sid) {
+  const u = String(unit);
+  if (!artVaAssessments[grade][u])      artVaAssessments[grade][u] = {};
+  if (!artVaAssessments[grade][u][sid]) artVaAssessments[grade][u][sid] = [{ type:'', date:'', description:'' }, { type:'', date:'', description:'' }];
+  return artVaAssessments[grade][u][sid];
+}
+function getMuAssessmentRows(grade, unit, sid) {
+  const u = String(unit);
+  if (!artMuAssessments[grade][u])      artMuAssessments[grade][u] = {};
+  if (!artMuAssessments[grade][u][sid]) artMuAssessments[grade][u][sid] = [{ type:'', date:'', description:'' }, { type:'', date:'', description:'' }];
+  return artMuAssessments[grade][u][sid];
+}
+
+function addVaToUnit(sid, unit) {
+  const key = String(unit);
+  if (!artVaAssignments[currentGrade][key].includes(sid)) {
+    artVaAssignments[currentGrade][key].push(sid);
+    render(); writeToFirestore();
+  }
+}
+function removeVaFromUnit(sid, unit) {
+  const key = String(unit);
+  const arr = artVaAssignments[currentGrade][key];
+  const i   = arr.indexOf(sid);
+  if (i > -1) { arr.splice(i, 1); render(); writeToFirestore(); }
+}
+function updateVaAssessment(sid, rowIndex, field, value) {
+  const rows = getVaAssessmentRows(currentGrade, detailUnit, sid);
+  rows[rowIndex][field] = value;
+  if (field === 'type') {
+    const stillHasPT = rows.some(r => r.type === 'Performance Task');
+    if (!stillHasPT) { const c = artVaPtCriteria[currentGrade][String(detailUnit)]; if (c) delete c[sid]; }
+    renderPerfTaskSection();
+  }
+  renderDetailSidebar(); writeToFirestore();
+}
+function handleVaDescInput(sid, rowIndex, inputEl) {
+  let val = inputEl.value, count = wordCount(val);
+  if (count > MAX_WORDS) { val = val.trim().split(/\s+/).slice(0, MAX_WORDS).join(' '); inputEl.value = val; count = MAX_WORDS; }
+  const el = inputEl.nextElementSibling;
+  if (el) { el.textContent = `${count}/${MAX_WORDS}`; el.className = 'asmt-word-count' + (count >= MAX_WORDS ? ' at-limit' : ''); }
+  updateVaAssessment(sid, rowIndex, 'description', val);
+}
+function updateVaPtCriterion(sid, index, value) {
+  const u = String(detailUnit);
+  if (!artVaPtCriteria[currentGrade][u]) artVaPtCriteria[currentGrade][u] = {};
+  if (!artVaPtCriteria[currentGrade][u][sid]) artVaPtCriteria[currentGrade][u][sid] = [''];
+  artVaPtCriteria[currentGrade][u][sid][index] = value;
+  writeToFirestore();
+}
+function addVaPtCriterion(sid) {
+  const u = String(detailUnit);
+  if (!artVaPtCriteria[currentGrade][u]) artVaPtCriteria[currentGrade][u] = {};
+  if (!artVaPtCriteria[currentGrade][u][sid]) artVaPtCriteria[currentGrade][u][sid] = [''];
+  if (artVaPtCriteria[currentGrade][u][sid].length < MAX_CRITERIA) { artVaPtCriteria[currentGrade][u][sid].push(''); renderPerfTaskSection(); writeToFirestore(); }
+}
+
+function addMuToUnit(sid, unit) {
+  const key = String(unit);
+  if (!artMuAssignments[currentGrade][key].includes(sid)) {
+    artMuAssignments[currentGrade][key].push(sid);
+    render(); writeToFirestore();
+  }
+}
+function removeMuFromUnit(sid, unit) {
+  const key = String(unit);
+  const arr = artMuAssignments[currentGrade][key];
+  const i   = arr.indexOf(sid);
+  if (i > -1) { arr.splice(i, 1); render(); writeToFirestore(); }
+}
+function updateMuAssessment(sid, rowIndex, field, value) {
+  const rows = getMuAssessmentRows(currentGrade, detailUnit, sid);
+  rows[rowIndex][field] = value;
+  if (field === 'type') {
+    const stillHasPT = rows.some(r => r.type === 'Performance Task');
+    if (!stillHasPT) { const c = artMuPtCriteria[currentGrade][String(detailUnit)]; if (c) delete c[sid]; }
+    renderPerfTaskSection();
+  }
+  renderDetailSidebar(); writeToFirestore();
+}
+function handleMuDescInput(sid, rowIndex, inputEl) {
+  let val = inputEl.value, count = wordCount(val);
+  if (count > MAX_WORDS) { val = val.trim().split(/\s+/).slice(0, MAX_WORDS).join(' '); inputEl.value = val; count = MAX_WORDS; }
+  const el = inputEl.nextElementSibling;
+  if (el) { el.textContent = `${count}/${MAX_WORDS}`; el.className = 'asmt-word-count' + (count >= MAX_WORDS ? ' at-limit' : ''); }
+  updateMuAssessment(sid, rowIndex, 'description', val);
+}
+function updateMuPtCriterion(sid, index, value) {
+  const u = String(detailUnit);
+  if (!artMuPtCriteria[currentGrade][u]) artMuPtCriteria[currentGrade][u] = {};
+  if (!artMuPtCriteria[currentGrade][u][sid]) artMuPtCriteria[currentGrade][u][sid] = [''];
+  artMuPtCriteria[currentGrade][u][sid][index] = value;
+  writeToFirestore();
+}
+function addMuPtCriterion(sid) {
+  const u = String(detailUnit);
+  if (!artMuPtCriteria[currentGrade][u]) artMuPtCriteria[currentGrade][u] = {};
+  if (!artMuPtCriteria[currentGrade][u][sid]) artMuPtCriteria[currentGrade][u][sid] = [''];
+  if (artMuPtCriteria[currentGrade][u][sid].length < MAX_CRITERIA) { artMuPtCriteria[currentGrade][u][sid].push(''); renderPerfTaskSection(); writeToFirestore(); }
 }
 
 /* Called oninput on pool detail textareas — saves without re-rendering to preserve focus */
@@ -3127,6 +3291,10 @@ function onDrop(e, unit, el) {
     addSjToUnit(payload.slice(4), unit);
   } else if (payload.startsWith('hist::')) {
     addHistToUnit(payload.slice(6), unit);
+  } else if (payload.startsWith('va::')) {
+    addVaToUnit(payload.slice(4), unit);
+  } else if (payload.startsWith('mu::')) {
+    addMuToUnit(payload.slice(4), unit);
   } else {
     addToUnit(payload, unit);
   }
@@ -3422,6 +3590,90 @@ function renderPool() {
     });
   }
 
+  /* ── Visual Arts / Music sections (Art/Music tab only) ── */
+  if (activeType() === 'art') {
+    const vaUnitMap = {};
+    for (let u = 1; u <= 6; u++) {
+      (artVaAssignments[currentGrade][String(u)] || []).forEach(sid => {
+        if (!vaUnitMap[sid]) vaUnitMap[sid] = [];
+        vaUnitMap[sid].push(u);
+      });
+    }
+    const muUnitMap = {};
+    for (let u = 1; u <= 6; u++) {
+      (artMuAssignments[currentGrade][String(u)] || []).forEach(sid => {
+        if (!muUnitMap[sid]) muUnitMap[sid] = [];
+        muUnitMap[sid].push(u);
+      });
+    }
+
+    const buildArtCards = (standards, customList, color, prefix, poolKey, unitMap) => {
+      const allItems = [...standards, ...customList.map(id => ({ id, desc: '' }))];
+      return allItems.map(std => {
+        const units    = unitMap[std.id] || [];
+        const pips     = units.map(u => `<div class="pip" style="background:${UNIT_COLORS[u-1]}">${u}</div>`).join('');
+        const isCustom = customList.includes(std.id);
+        const safeSid  = std.id.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        const delBtn   = isCustom ? `<button class="pool-custom-delete" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();deleteCustomItem('${poolKey}','${safeSid}')">&#215;</button>` : '';
+        const truncDesc = std.desc && std.desc.length > 50 ? std.desc.slice(0, 50) + '…' : std.desc;
+        return `
+          <div class="std-card" draggable="true" data-drag-id="${prefix}::${std.id}"
+               style="border-left-color:${color}" title="${std.desc || ''}">
+            <div style="display:flex;align-items:center;gap:4px">
+              <div class="std-card-code" style="color:${color};flex:1">${std.id}</div>
+              ${delBtn}
+            </div>
+            ${truncDesc ? `<div class="std-card-desc">${truncDesc}</div>` : ''}
+            ${units.length ? `<div class="std-card-pips">${pips}</div>` : ''}
+          </div>`;
+      }).join('');
+    };
+
+    const vaCards = buildArtCards(VA_STANDARDS, customItems.visualArts, VA_COLOR, 'va', 'visualArts', vaUnitMap);
+    const muCards = buildArtCards(MU_STANDARDS, customItems.music,      MU_COLOR, 'mu', 'music',      muUnitMap);
+    const vaTotal = VA_STANDARDS.length + customItems.visualArts.length;
+    const muTotal = MU_STANDARDS.length + customItems.music.length;
+
+    html += `
+      <div class="pool-group-label">Arts Standards</div>
+      <div class="strand-section">
+        <div class="strand-header" onclick="toggleStrand(this)">
+          <div class="strand-dot" style="background:${VA_COLOR}"></div>
+          <span class="strand-name" style="color:${VA_COLOR}">Visual Arts</span>
+          <span class="strand-count">${vaTotal}</span>
+          <span class="strand-chevron">&#9662;</span>
+        </div>
+        <div class="strand-cards">
+          ${vaCards}
+          <button class="pool-add-btn" id="pool-add-btn-visualArts" onclick="showPoolAddInput('visualArts')">+ Add item</button>
+          <div class="pool-add-row" id="pool-add-row-visualArts">
+            <input class="pool-add-input" id="pool-add-input-visualArts" type="text" placeholder="Standard code…"
+                   onkeydown="if(event.key==='Enter')confirmPoolAdd('visualArts');else if(event.key==='Escape')cancelPoolAdd('visualArts')">
+            <button class="pool-add-confirm" onmousedown="event.preventDefault()" onclick="confirmPoolAdd('visualArts')">Add</button>
+            <button class="pool-add-cancel" onmousedown="event.preventDefault()" onclick="cancelPoolAdd('visualArts')">&#215;</button>
+          </div>
+        </div>
+      </div>
+      <div class="strand-section">
+        <div class="strand-header" onclick="toggleStrand(this)">
+          <div class="strand-dot" style="background:${MU_COLOR}"></div>
+          <span class="strand-name" style="color:${MU_COLOR}">Music</span>
+          <span class="strand-count">${muTotal}</span>
+          <span class="strand-chevron">&#9662;</span>
+        </div>
+        <div class="strand-cards">
+          ${muCards}
+          <button class="pool-add-btn" id="pool-add-btn-music" onclick="showPoolAddInput('music')">+ Add item</button>
+          <div class="pool-add-row" id="pool-add-row-music">
+            <input class="pool-add-input" id="pool-add-input-music" type="text" placeholder="Standard code…"
+                   onkeydown="if(event.key==='Enter')confirmPoolAdd('music');else if(event.key==='Escape')cancelPoolAdd('music')">
+            <button class="pool-add-confirm" onmousedown="event.preventDefault()" onclick="confirmPoolAdd('music')">Add</button>
+            <button class="pool-add-cancel" onmousedown="event.preventDefault()" onclick="cancelPoolAdd('music')">&#215;</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
   html += `<div class="pool-group-label">Social Justice Standards</div>`;
 
   Object.entries(SJ_DOMAINS).forEach(([domain, stds]) => {
@@ -3566,7 +3818,9 @@ function confirmPoolAdd(poolType) {
                   : poolType === 'performanceTasks'         ? PERF_ITEMS
                   : poolType === 'themes'                   ? THEME_ITEMS
                   : poolType === 'socialJustice'            ? [...Object.values(SJ_DOMAINS).flat().map(s => s.id)]
-                  : poolType === 'historyContentStandards'  ? []   // no built-ins; only check existing custom items
+                  : poolType === 'historyContentStandards'  ? []
+                  : poolType === 'visualArts'               ? VA_STANDARDS.map(s => s.id)
+                  : poolType === 'music'                    ? MU_STANDARDS.map(s => s.id)
                   :                                           CURR_ITEMS;
   const existing = [...hardcoded, ...customItems[poolType]];
   if (existing.includes(label)) { inp.select(); return; }
@@ -3738,7 +3992,9 @@ function renderUnits() {
     const currItems  = currA[currentGrade][uKey]  || [];
     const sjItems    = sjA[currentGrade][uKey]    || [];
     const histItems  = histA[currentGrade][uKey]  || [];
-    const totalItems = stds.length + genreItems.length + perfItems.length + themeItems.length + currItems.length + sjItems.length + histItems.length;
+    const vaItems    = isArtMusic ? (artVaAssignments[currentGrade][uKey] || []) : [];
+    const muItems    = isArtMusic ? (artMuAssignments[currentGrade][uKey] || []) : [];
+    const totalItems = stds.length + genreItems.length + perfItems.length + themeItems.length + currItems.length + sjItems.length + histItems.length + vaItems.length + muItems.length;
 
     const titlePrefix = isHumanities ? 'Humanities ' : isSpanish ? 'Spanish ' : isArtMusic ? 'Art/Music ' : 'ELA ';
     const chip        = isHumanities ? '<span class="hum-chip">H</span>'
@@ -3822,6 +4078,26 @@ function renderUnits() {
                 onclick="removeHistFromUnit('${sid}',${u})">&#215;</button>
       </div>`).join('');
 
+    const vaHtml = vaItems.map(sid => `
+      <div class="unit-std-item">
+        <div class="unit-std-info">
+          <span class="pool-tag va-tag">VA</span>
+          <div class="unit-std-code" style="margin-top:3px;color:${VA_COLOR}">${sid}</div>
+        </div>
+        <button class="unit-std-remove" title="Remove"
+                onclick="removeVaFromUnit('${sid}',${u})">&#215;</button>
+      </div>`).join('');
+
+    const muHtml = muItems.map(sid => `
+      <div class="unit-std-item">
+        <div class="unit-std-info">
+          <span class="pool-tag mu-tag">MU</span>
+          <div class="unit-std-code" style="margin-top:3px;color:${MU_COLOR}">${sid}</div>
+        </div>
+        <button class="unit-std-remove" title="Remove"
+                onclick="removeMuFromUnit('${sid}',${u})">&#215;</button>
+      </div>`).join('');
+
     html += `
       <div class="unit-col unit--${u}${isHumanities?' hum':''}${isSpanish?' spa':''}${isArtMusic?' art':''}"
            ondragover="onDragOver(event,this)"
@@ -3836,7 +4112,7 @@ function renderUnits() {
           <span class="unit-open-hint" title="Double-click to open detail">&#8599;</span>
         </div>
         <div class="unit-drop-zone">
-          ${totalItems ? (themeHtml + currHtml + genreHtml + perfHtml + sjHtml + histHtml + stdHtml) : '<div class="unit-empty">Drop content here</div>'}
+          ${totalItems ? (themeHtml + currHtml + genreHtml + perfHtml + sjHtml + histHtml + vaHtml + muHtml + stdHtml) : '<div class="unit-empty">Drop content here</div>'}
         </div>
       </div>`;
   }
@@ -3892,6 +4168,10 @@ function renderDetailSidebar() {
   const sjUnitData = (activeSjAssessments()[currentGrade] || {})[u] || {};
   const histUnitStds = activeHistAssignments()[currentGrade][u] || [];
   const histUnitData = (activeHistAssessments()[currentGrade] || {})[u] || {};
+  const vaUnitStds   = (artVaAssignments[currentGrade] || {})[u] || [];
+  const vaUnitData   = (artVaAssessments[currentGrade] || {})[u] || {};
+  const muUnitStds   = (artMuAssignments[currentGrade] || {})[u] || [];
+  const muUnitData   = (artMuAssessments[currentGrade] || {})[u] || {};
 
   // Collect every assessment row that has BOTH type and date
   const scheduled = [];
@@ -3907,6 +4187,16 @@ function renderDetailSidebar() {
   });
   histUnitStds.forEach(sid => {
     (histUnitData[sid] || []).forEach((row, i) => {
+      if (row.type && row.date) scheduled.push({ sid, rowIndex: i, type: row.type, date: row.date, description: row.description || '' });
+    });
+  });
+  vaUnitStds.forEach(sid => {
+    (vaUnitData[sid] || []).forEach((row, i) => {
+      if (row.type && row.date) scheduled.push({ sid, rowIndex: i, type: row.type, date: row.date, description: row.description || '' });
+    });
+  });
+  muUnitStds.forEach(sid => {
+    (muUnitData[sid] || []).forEach((row, i) => {
       if (row.type && row.date) scheduled.push({ sid, rowIndex: i, type: row.type, date: row.date, description: row.description || '' });
     });
   });
@@ -3974,9 +4264,25 @@ function buildPerfTaskSection(u) {
     return Array.isArray(rows) && rows.some(r => r.type === 'Performance Task');
   });
 
+  // Visual Arts standards with PT assessments (Art/Music tab only)
+  const vaStds   = (artVaAssignments[currentGrade] || {})[u] || [];
+  const vaCrit   = (artVaPtCriteria[currentGrade] || {})[u] || {};
+  const ptVaStds = vaStds.filter(sid => {
+    const rows = ((artVaAssessments[currentGrade] || {})[u] || {})[sid];
+    return Array.isArray(rows) && rows.some(r => r.type === 'Performance Task');
+  });
+
+  // Music standards with PT assessments (Art/Music tab only)
+  const muStds   = (artMuAssignments[currentGrade] || {})[u] || [];
+  const muCrit   = (artMuPtCriteria[currentGrade] || {})[u] || {};
+  const ptMuStds = muStds.filter(sid => {
+    const rows = ((artMuAssessments[currentGrade] || {})[u] || {})[sid];
+    return Array.isArray(rows) && rows.some(r => r.type === 'Performance Task');
+  });
+
   const header = `<div class="pool-section-hdr">Performance Tasks</div>`;
 
-  if (ptStds.length === 0 && ptSjStds.length === 0 && ptHistStds.length === 0) {
+  if (ptStds.length === 0 && ptSjStds.length === 0 && ptHistStds.length === 0 && ptVaStds.length === 0 && ptMuStds.length === 0) {
     return `${header}<div class="pt-empty">No Performance Task assessments assigned yet</div>`;
   }
 
@@ -4017,7 +4323,17 @@ function buildPerfTaskSection(u) {
     return buildCard(sid, criteria, HIST_COLOR, 'updateHistPtCriterion', 'addHistPtCriterion');
   }).join('');
 
-  return `${header}${ccssCards}${sjCards}${histCards}`;
+  const vaCards = ptVaStds.map(sid => {
+    const criteria = (vaCrit[sid] && vaCrit[sid].length > 0) ? vaCrit[sid] : [''];
+    return buildCard(sid, criteria, VA_COLOR, 'updateVaPtCriterion', 'addVaPtCriterion');
+  }).join('');
+
+  const muCards = ptMuStds.map(sid => {
+    const criteria = (muCrit[sid] && muCrit[sid].length > 0) ? muCrit[sid] : [''];
+    return buildCard(sid, criteria, MU_COLOR, 'updateMuPtCriterion', 'addMuPtCriterion');
+  }).join('');
+
+  return `${header}${ccssCards}${sjCards}${histCards}${vaCards}${muCards}`;
 }
 
 function renderPerfTaskSection() {
@@ -4053,6 +4369,8 @@ function renderDetailView() {
   // Only show built-in SJ standards in detail screen; custom "catch-all" items (pool-only) are excluded
   const sjStds   = (activeSjAssignments()[currentGrade][u] || []).filter(sid => SJ_IDS.has(sid));
   const histStds = activeHistAssignments()[currentGrade][u] || [];
+  const vaStds   = (artVaAssignments[currentGrade] || {})[u] || [];
+  const muStds   = (artMuAssignments[currentGrade] || {})[u] || [];
   const lookup   = buildLookup(currentGrade);
   const el     = document.getElementById('detailContent');
 
@@ -4062,7 +4380,7 @@ function renderDetailView() {
   /* ── Bottom: standards + always-on PT section ────────── */
   let bottomHtml = '';
 
-  const hasAnyContent = stds.length > 0 || sjStds.length > 0 || histStds.length > 0;
+  const hasAnyContent = stds.length > 0 || sjStds.length > 0 || histStds.length > 0 || vaStds.length > 0 || muStds.length > 0;
   if (!hasAnyContent) {
     bottomHtml = `<div class="detail-empty" style="padding:40px 20px">No content assigned yet.<br>
       <span style="font-size:.8rem;color:var(--text-light);margin-top:6px;display:block">
@@ -4201,6 +4519,98 @@ function renderDetailView() {
         return `
           <div class="std-detail-card" style="border-left-color:${HIST_COLOR}">
             <div class="std-detail-code" style="color:${HIST_COLOR}">${sid}</div>
+            <hr class="asmt-divider">
+            <div class="asmt-rows">${asmtRows}</div>
+          </div>`;
+      }).join('');
+    }
+
+    /* ── Visual Arts Standards cards ─────────────────────── */
+    if (vaStds.length > 0) {
+      bottomHtml += `<div class="pool-section-hdr">Visual Arts Standards</div>`;
+      bottomHtml += vaStds.map(sid => {
+        const std  = VA_STANDARDS.find(s => s.id === sid) || { id: sid, desc: '' };
+        const rows = getVaAssessmentRows(currentGrade, detailUnit, sid);
+
+        const asmtRows = [0, 1].map(i => {
+          const row  = rows[i] || { type:'', date:'', description:'' };
+          const desc = row.description || '';
+          const wc   = wordCount(desc);
+          return `
+            <div class="asmt-row">
+              <div class="asmt-row-top">
+                <span class="asmt-label">Assessment ${i + 1}</span>
+                <select class="asmt-select"
+                        onchange="updateVaAssessment('${sid}',${i},'type',this.value)">
+                  <option value=""                 ${row.type===''                 ?'selected':''}>&#8212; select type &#8212;</option>
+                  <option value="Quiz"             ${row.type==='Quiz'             ?'selected':''}>Quiz</option>
+                  <option value="Writing Task"     ${row.type==='Writing Task'     ?'selected':''}>Writing Task</option>
+                  <option value="Project"          ${row.type==='Project'          ?'selected':''}>Project</option>
+                  <option value="Final Assessment" ${row.type==='Final Assessment' ?'selected':''}>Final Assessment</option>
+                  <option value="Performance Task" ${row.type==='Performance Task' ?'selected':''}>Performance Task</option>
+                </select>
+                <input type="date" class="asmt-date" value="${row.date || ''}"
+                       onchange="updateVaAssessment('${sid}',${i},'date',this.value)">
+              </div>
+              <div class="asmt-row-bottom">
+                <input type="text" class="asmt-desc" placeholder="Brief description..."
+                       value="${desc.replace(/"/g, '&quot;')}"
+                       oninput="handleVaDescInput('${sid}',${i},this)">
+                <span class="asmt-word-count${wc >= MAX_WORDS ? ' at-limit' : ''}">${wc}/${MAX_WORDS}</span>
+              </div>
+            </div>`;
+        }).join('');
+
+        return `
+          <div class="std-detail-card" style="border-left-color:${VA_COLOR}">
+            <div class="std-detail-code" style="color:${VA_COLOR}">${std.id}</div>
+            ${std.desc ? `<div class="std-detail-desc">${std.desc}</div>` : ''}
+            <hr class="asmt-divider">
+            <div class="asmt-rows">${asmtRows}</div>
+          </div>`;
+      }).join('');
+    }
+
+    /* ── Music Standards cards ───────────────────────────── */
+    if (muStds.length > 0) {
+      bottomHtml += `<div class="pool-section-hdr">Music Standards</div>`;
+      bottomHtml += muStds.map(sid => {
+        const std  = MU_STANDARDS.find(s => s.id === sid) || { id: sid, desc: '' };
+        const rows = getMuAssessmentRows(currentGrade, detailUnit, sid);
+
+        const asmtRows = [0, 1].map(i => {
+          const row  = rows[i] || { type:'', date:'', description:'' };
+          const desc = row.description || '';
+          const wc   = wordCount(desc);
+          return `
+            <div class="asmt-row">
+              <div class="asmt-row-top">
+                <span class="asmt-label">Assessment ${i + 1}</span>
+                <select class="asmt-select"
+                        onchange="updateMuAssessment('${sid}',${i},'type',this.value)">
+                  <option value=""                 ${row.type===''                 ?'selected':''}>&#8212; select type &#8212;</option>
+                  <option value="Quiz"             ${row.type==='Quiz'             ?'selected':''}>Quiz</option>
+                  <option value="Writing Task"     ${row.type==='Writing Task'     ?'selected':''}>Writing Task</option>
+                  <option value="Project"          ${row.type==='Project'          ?'selected':''}>Project</option>
+                  <option value="Final Assessment" ${row.type==='Final Assessment' ?'selected':''}>Final Assessment</option>
+                  <option value="Performance Task" ${row.type==='Performance Task' ?'selected':''}>Performance Task</option>
+                </select>
+                <input type="date" class="asmt-date" value="${row.date || ''}"
+                       onchange="updateMuAssessment('${sid}',${i},'date',this.value)">
+              </div>
+              <div class="asmt-row-bottom">
+                <input type="text" class="asmt-desc" placeholder="Brief description..."
+                       value="${desc.replace(/"/g, '&quot;')}"
+                       oninput="handleMuDescInput('${sid}',${i},this)">
+                <span class="asmt-word-count${wc >= MAX_WORDS ? ' at-limit' : ''}">${wc}/${MAX_WORDS}</span>
+              </div>
+            </div>`;
+        }).join('');
+
+        return `
+          <div class="std-detail-card" style="border-left-color:${MU_COLOR}">
+            <div class="std-detail-code" style="color:${MU_COLOR}">${std.id}</div>
+            ${std.desc ? `<div class="std-detail-desc">${std.desc}</div>` : ''}
             <hr class="asmt-divider">
             <div class="asmt-rows">${asmtRows}</div>
           </div>`;
