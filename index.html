@@ -398,6 +398,15 @@
       flex-shrink: 0; line-height: 1.5;
     }
 
+    /* Art/Music unit column — subtle teal tint + "A" chip */
+    .unit-col.art .unit-col-head { background: #F0FDFA; }
+    .art-chip {
+      font-size: .53rem; font-weight: 800; text-transform: uppercase;
+      letter-spacing: .04em; padding: 1px 4px; border-radius: 3px;
+      background: #99F6E4; color: #0F766E;
+      flex-shrink: 0; line-height: 1.5;
+    }
+
     /* ── TRIMESTER DETAIL VIEW ──────────────────────────── */
     .trim-detail-view {
       flex: 1;
@@ -1369,7 +1378,7 @@ const STANDARDS = {
 let currentGrade    = '6';
 let currentView     = 'main'; // 'main' | 'unit'
 let detailUnit      = null;   // 1–6 when in unit detail view
-let detailUnitType  = 'ela';  // 'ela' | 'hum' | 'spa' — set when opening unit detail
+let detailUnitType  = 'ela';  // 'ela' | 'hum' | 'spa' | 'art' — set when opening unit detail
 
 /* Per-grade ELA / Humanities / Spanish toggle state (not persisted; resets on page load) */
 let currentUnitType = { '6': 'ela', '7': 'ela', '8': 'ela' };
@@ -1420,6 +1429,27 @@ let spPerfDetails      = makeDefaultDetails();
 let spThemeDetails     = makeDefaultDetails();
 let spCurrDetails      = makeDefaultDetails();
 let spUnitDetails      = makeDefaultUnitDetails();
+
+/* ── Art/Music data (parallel structures) ──────────────── */
+let artAssignments  = makeDefaultAssignments();
+let artAssessments  = makeDefaultAssessments();
+
+let artGenreAssignments = makeDefaultPoolAssignments();
+let artPerfAssignments  = makeDefaultPoolAssignments();
+let artThemeAssignments = makeDefaultPoolAssignments();
+let artCurrAssignments  = makeDefaultPoolAssignments();
+let artGenreDetails     = makeDefaultDetails();
+let artPerfDetails      = makeDefaultDetails();
+let artThemeDetails     = makeDefaultDetails();
+let artCurrDetails      = makeDefaultDetails();
+let artUnitDetails      = makeDefaultUnitDetails();
+let artPtCriteria       = makeDefaultPtCriteria();
+let artSjAssignments    = makeDefaultAssignments();
+let artSjAssessments    = makeDefaultAssessments();
+let artSjPtCriteria     = makeDefaultPtCriteria();
+let artHistAssignments  = makeDefaultAssignments();
+let artHistAssessments  = makeDefaultAssessments();
+let artHistPtCriteria   = makeDefaultPtCriteria();
 
 /* Trimesters — separate data per grade, 3 units (1-3) */
 let trimAssignments      = makeDefaultAssignments();
@@ -2027,6 +2057,26 @@ function startSync() {
         socialJustice:          Array.isArray(ci.socialJustice)          ? ci.socialJustice          : [],
         historyContentStandards: Array.isArray(ci.historyContentStandards) ? ci.historyContentStandards : [],
       };
+      /* Art/Music */
+      const am = data.artMusic || {};
+      artAssignments      = decodeUnits(am.units);
+      artAssessments      = decodeAssessments(am.assessments);
+      artGenreAssignments = decodePoolAssignments(am.genreAssignments);
+      artPerfAssignments  = decodePoolAssignments(am.perfAssignments);
+      artThemeAssignments = decodePoolAssignments(am.themeAssignments);
+      artCurrAssignments  = decodePoolAssignments(am.currAssignments);
+      artGenreDetails     = decodeDetailMap(am.genreDetails);
+      artPerfDetails      = decodeDetailMap(am.perfDetails);
+      artThemeDetails     = decodeDetailMap(am.themeDetails);
+      artCurrDetails      = decodeDetailMap(am.currDetails);
+      artUnitDetails      = decodeUnitDetails(am.unitDetails);
+      artPtCriteria       = decodePtCriteria(am.ptCriteria);
+      artSjAssignments    = decodeUnits(am.sjUnits);
+      artSjAssessments    = decodeAssessments(am.sjAssessments);
+      artSjPtCriteria     = decodePtCriteria(am.sjPtCriteria);
+      artHistAssignments  = decodeUnits(am.historyUnits);
+      artHistAssessments  = decodeAssessments(am.historyAssessments);
+      artHistPtCriteria   = decodePtCriteria(am.historyPtCriteria);
       /* Trimester detail content */
       trimesterDetails = decodeTrimesterDetails(data.trimesterDetails);
       /* Deleted hardcoded pool items */
@@ -2126,6 +2176,27 @@ async function writeToFirestore() {
       spanishHistoryUnits:         encodeUnits(spHistAssignments),
       spanishHistoryAssessments:   encodeAssessments(spHistAssessments),
       spanishHistoryPtCriteria:    encodePtCriteria(spHistPtCriteria),
+      /* Art/Music */
+      artMusic: {
+        units:            encodeUnits(artAssignments),
+        assessments:      encodeAssessments(artAssessments),
+        genreAssignments: encodePoolAssignments(artGenreAssignments),
+        perfAssignments:  encodePoolAssignments(artPerfAssignments),
+        themeAssignments: encodePoolAssignments(artThemeAssignments),
+        currAssignments:  encodePoolAssignments(artCurrAssignments),
+        genreDetails:     encodeDetailMap(artGenreDetails),
+        perfDetails:      encodeDetailMap(artPerfDetails),
+        themeDetails:     encodeDetailMap(artThemeDetails),
+        currDetails:      encodeDetailMap(artCurrDetails),
+        unitDetails:      encodeUnitDetails(artUnitDetails),
+        ptCriteria:       encodePtCriteria(artPtCriteria),
+        sjUnits:          encodeUnits(artSjAssignments),
+        sjAssessments:    encodeAssessments(artSjAssessments),
+        sjPtCriteria:     encodePtCriteria(artSjPtCriteria),
+        historyUnits:     encodeUnits(artHistAssignments),
+        historyAssessments: encodeAssessments(artHistAssessments),
+        historyPtCriteria:  encodePtCriteria(artHistPtCriteria),
+      },
       /* Custom pool items */
       customItems: {
         texts:            customItems.texts,
@@ -2164,75 +2235,75 @@ function isTri() { return activeType() === 'tri'; }
 
 function activeAssignments() {
   const t = activeType();
-  return t === 'hum' ? humAssignments : t === 'spa' ? spAssignments : t === 'tri' ? trimAssignments : assignments;
+  return t === 'hum' ? humAssignments : t === 'spa' ? spAssignments : t === 'tri' ? trimAssignments : t === 'art' ? artAssignments : assignments;
 }
 function activeAssessments() {
   const t = activeType();
-  return t === 'hum' ? humAssessments : t === 'spa' ? spAssessments : t === 'tri' ? trimAssessments : assessments;
+  return t === 'hum' ? humAssessments : t === 'spa' ? spAssessments : t === 'tri' ? trimAssessments : t === 'art' ? artAssessments : assessments;
 }
 function activeGenreAssignments() {
   const t = activeType();
-  return t === 'hum' ? humGenreAssignments : t === 'spa' ? spGenreAssignments : t === 'tri' ? trimGenreAssignments : genreAssignments;
+  return t === 'hum' ? humGenreAssignments : t === 'spa' ? spGenreAssignments : t === 'tri' ? trimGenreAssignments : t === 'art' ? artGenreAssignments : genreAssignments;
 }
 function activePerfAssignments() {
   const t = activeType();
-  return t === 'hum' ? humPerfAssignments : t === 'spa' ? spPerfAssignments : t === 'tri' ? trimPerfAssignments : performanceAssignments;
+  return t === 'hum' ? humPerfAssignments : t === 'spa' ? spPerfAssignments : t === 'tri' ? trimPerfAssignments : t === 'art' ? artPerfAssignments : performanceAssignments;
 }
 function activeThemeAssignments() {
   const t = activeType();
-  return t === 'hum' ? humThemeAssignments : t === 'spa' ? spThemeAssignments : t === 'tri' ? trimThemeAssignments : themeAssignments;
+  return t === 'hum' ? humThemeAssignments : t === 'spa' ? spThemeAssignments : t === 'tri' ? trimThemeAssignments : t === 'art' ? artThemeAssignments : themeAssignments;
 }
 function activeGenreDetails() {
   const t = activeType();
-  return t === 'hum' ? humGenreDetails : t === 'spa' ? spGenreDetails : genreDetails;
+  return t === 'hum' ? humGenreDetails : t === 'spa' ? spGenreDetails : t === 'art' ? artGenreDetails : genreDetails;
 }
 function activePerfDetails() {
   const t = activeType();
-  return t === 'hum' ? humPerfDetails : t === 'spa' ? spPerfDetails : performanceDetails;
+  return t === 'hum' ? humPerfDetails : t === 'spa' ? spPerfDetails : t === 'art' ? artPerfDetails : performanceDetails;
 }
 function activeThemeDetails() {
   const t = activeType();
-  return t === 'hum' ? humThemeDetails : t === 'spa' ? spThemeDetails : themeDetails;
+  return t === 'hum' ? humThemeDetails : t === 'spa' ? spThemeDetails : t === 'art' ? artThemeDetails : themeDetails;
 }
 function activeCurrAssignments() {
   const t = activeType();
-  return t === 'hum' ? humCurrAssignments : t === 'spa' ? spCurrAssignments : t === 'tri' ? trimCurrAssignments : curriculumAssignments;
+  return t === 'hum' ? humCurrAssignments : t === 'spa' ? spCurrAssignments : t === 'tri' ? trimCurrAssignments : t === 'art' ? artCurrAssignments : curriculumAssignments;
 }
 function activeCurrDetails() {
   const t = activeType();
-  return t === 'hum' ? humCurrDetails : t === 'spa' ? spCurrDetails : curriculumDetails;
+  return t === 'hum' ? humCurrDetails : t === 'spa' ? spCurrDetails : t === 'art' ? artCurrDetails : curriculumDetails;
 }
 function activeUnitDetails() {
   const t = activeType();
-  return t === 'hum' ? humUnitDetails : t === 'spa' ? spUnitDetails : t === 'tri' ? trimUnitDetails : unitDetails;
+  return t === 'hum' ? humUnitDetails : t === 'spa' ? spUnitDetails : t === 'tri' ? trimUnitDetails : t === 'art' ? artUnitDetails : unitDetails;
 }
 function activePtCriteria() {
   const t = activeType();
-  return t === 'hum' ? humPtCriteria : t === 'spa' ? spPtCriteria : t === 'tri' ? trimPtCriteria : ptCriteria;
+  return t === 'hum' ? humPtCriteria : t === 'spa' ? spPtCriteria : t === 'tri' ? trimPtCriteria : t === 'art' ? artPtCriteria : ptCriteria;
 }
 function activeSjAssignments() {
   const t = activeType();
-  return t === 'hum' ? humSjAssignments : t === 'spa' ? spSjAssignments : t === 'tri' ? trimSjAssignments : sjAssignments;
+  return t === 'hum' ? humSjAssignments : t === 'spa' ? spSjAssignments : t === 'tri' ? trimSjAssignments : t === 'art' ? artSjAssignments : sjAssignments;
 }
 function activeSjAssessments() {
   const t = activeType();
-  return t === 'hum' ? humSjAssessments : t === 'spa' ? spSjAssessments : t === 'tri' ? trimSjAssessments : sjAssessments;
+  return t === 'hum' ? humSjAssessments : t === 'spa' ? spSjAssessments : t === 'tri' ? trimSjAssessments : t === 'art' ? artSjAssessments : sjAssessments;
 }
 function activeSjPtCriteria() {
   const t = activeType();
-  return t === 'hum' ? humSjPtCriteria : t === 'spa' ? spSjPtCriteria : t === 'tri' ? trimSjPtCriteria : sjPtCriteria;
+  return t === 'hum' ? humSjPtCriteria : t === 'spa' ? spSjPtCriteria : t === 'tri' ? trimSjPtCriteria : t === 'art' ? artSjPtCriteria : sjPtCriteria;
 }
 function activeHistAssignments() {
   const t = activeType();
-  return t === 'hum' ? humHistAssignments : t === 'spa' ? spHistAssignments : t === 'tri' ? trimHistAssignments : histAssignments;
+  return t === 'hum' ? humHistAssignments : t === 'spa' ? spHistAssignments : t === 'tri' ? trimHistAssignments : t === 'art' ? artHistAssignments : histAssignments;
 }
 function activeHistAssessments() {
   const t = activeType();
-  return t === 'hum' ? humHistAssessments : t === 'spa' ? spHistAssessments : t === 'tri' ? trimHistAssessments : histAssessments;
+  return t === 'hum' ? humHistAssessments : t === 'spa' ? spHistAssessments : t === 'tri' ? trimHistAssessments : t === 'art' ? artHistAssessments : histAssessments;
 }
 function activeHistPtCriteria() {
   const t = activeType();
-  return t === 'hum' ? humHistPtCriteria : t === 'spa' ? spHistPtCriteria : t === 'tri' ? trimHistPtCriteria : histPtCriteria;
+  return t === 'hum' ? humHistPtCriteria : t === 'spa' ? spHistPtCriteria : t === 'tri' ? trimHistPtCriteria : t === 'art' ? artHistPtCriteria : histPtCriteria;
 }
 
 /* Toggle between ELA and Humanities unit grids (per grade) */
@@ -2948,7 +3019,7 @@ function openUnitDetail(unit, evt, unitType) {
   detailUnit     = unit;
   detailUnitType = unitType || currentUnitType[currentGrade];
   currentView    = 'unit';
-  const typeLabel = detailUnitType === 'hum' ? 'Humanities ' : detailUnitType === 'spa' ? 'Spanish ' : detailUnitType === 'tri' ? 'Trimester ' : 'ELA ';
+  const typeLabel = detailUnitType === 'hum' ? 'Humanities ' : detailUnitType === 'spa' ? 'Spanish ' : detailUnitType === 'tri' ? 'Trimester ' : detailUnitType === 'art' ? 'Art/Music ' : 'ELA ';
   document.getElementById('mainCtrl').style.display      = 'none';
   document.getElementById('detailCtrl').style.display    = 'flex';
   document.getElementById('detailTitle').textContent     = `Grade ${currentGrade} — ${typeLabel}${unit}`;
@@ -3087,6 +3158,7 @@ function renderUnitToggle() {
       <button class="toggle-btn${active==='ela'?' active':''}" onclick="switchUnitType('ela')">ELA</button>
       <button class="toggle-btn${active==='hum'?' active':''}" onclick="switchUnitType('hum')">Humanities</button>
       <button class="toggle-btn${active==='spa'?' active':''}" onclick="switchUnitType('spa')">Spanish</button>
+      <button class="toggle-btn${active==='art'?' active':''}" onclick="switchUnitType('art')">Art/Music</button>
     </div>`;
 }
 
@@ -3642,11 +3714,12 @@ function renderTrimesterUnits() {
 }
 
 function renderUnits() {
-  const unitType = currentUnitType[currentGrade]; // 'ela' | 'hum' | 'spa' | 'tri'
+  const unitType = currentUnitType[currentGrade]; // 'ela' | 'hum' | 'spa' | 'tri' | 'art'
   if (unitType === 'tri') { renderTrimesterUnits(); return; }
   const lookup   = buildLookup(currentGrade);
   const isHumanities = unitType === 'hum';
   const isSpanish    = unitType === 'spa';
+  const isArtMusic   = unitType === 'art';
   const asgn    = activeAssignments();
   const genreA  = activeGenreAssignments();
   const perfA   = activePerfAssignments();
@@ -3667,9 +3740,10 @@ function renderUnits() {
     const histItems  = histA[currentGrade][uKey]  || [];
     const totalItems = stds.length + genreItems.length + perfItems.length + themeItems.length + currItems.length + sjItems.length + histItems.length;
 
-    const titlePrefix = isHumanities ? 'Humanities ' : isSpanish ? 'Spanish ' : 'ELA ';
+    const titlePrefix = isHumanities ? 'Humanities ' : isSpanish ? 'Spanish ' : isArtMusic ? 'Art/Music ' : 'ELA ';
     const chip        = isHumanities ? '<span class="hum-chip">H</span>'
                       : isSpanish    ? '<span class="spa-chip">S</span>'
+                      : isArtMusic   ? '<span class="art-chip">A</span>'
                       : '';
 
     const stdHtml = stds.map(sid => {
@@ -3749,7 +3823,7 @@ function renderUnits() {
       </div>`).join('');
 
     html += `
-      <div class="unit-col unit--${u}${isHumanities?' hum':''}${isSpanish?' spa':''}"
+      <div class="unit-col unit--${u}${isHumanities?' hum':''}${isSpanish?' spa':''}${isArtMusic?' art':''}"
            ondragover="onDragOver(event,this)"
            ondragleave="onDragLeave(event,this)"
            ondrop="onDrop(event,${u},this)"
