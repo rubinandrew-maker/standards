@@ -1546,6 +1546,7 @@ const TRI_SECTIONS = [
   { key: 'elaConnection',            label: 'ELA Connection' },
   { key: 'ssConnection',             label: 'SS Connection' },
   { key: 'spanishConnection',        label: 'Spanish Connection' },
+  { key: 'artMusicConnection',       label: 'Art/Music Connection' },
 ];
 
 function makeDefaultTrimesterDetails() {
@@ -1559,6 +1560,7 @@ function makeDefaultTrimesterDetails() {
         elaConnection: '', elaConnectionPublished: false,
         ssConnection: '', ssConnectionPublished: false,
         spanishConnection: '', spanishConnectionPublished: false,
+        artMusicConnection: '', artMusicConnectionPublished: false,
       };
     });
   });
@@ -1995,6 +1997,8 @@ function decodeTrimesterDetails(data) {
         ssConnectionPublished:                 !!d.ssConnectionPublished,
         spanishConnection:                     d.spanishConnection || '',
         spanishConnectionPublished:            !!d.spanishConnectionPublished,
+        artMusicConnection:                    d.artMusicConnection || '',
+        artMusicConnectionPublished:           !!d.artMusicConnectionPublished,
       };
     });
   });
