@@ -4223,10 +4223,11 @@ function renderDetailSidebar() {
   const sjUnitData = (activeSjAssessments()[currentGrade] || {})[u] || {};
   const histUnitStds = activeHistAssignments()[currentGrade][u] || [];
   const histUnitData = (activeHistAssessments()[currentGrade] || {})[u] || {};
-  const vaUnitStds   = (artVaAssignments[currentGrade] || {})[u] || [];
-  const vaUnitData   = (artVaAssessments[currentGrade] || {})[u] || {};
-  const muUnitStds   = (artMuAssignments[currentGrade] || {})[u] || [];
-  const muUnitData   = (artMuAssessments[currentGrade] || {})[u] || {};
+  const isArtDetail  = detailUnitType === 'art';
+  const vaUnitStds   = isArtDetail ? ((artVaAssignments[currentGrade] || {})[u] || []) : [];
+  const vaUnitData   = isArtDetail ? ((artVaAssessments[currentGrade] || {})[u] || {}) : {};
+  const muUnitStds   = isArtDetail ? ((artMuAssignments[currentGrade] || {})[u] || []) : [];
+  const muUnitData   = isArtDetail ? ((artMuAssessments[currentGrade] || {})[u] || {}) : {};
 
   // Collect every assessment row that has BOTH type and date
   const scheduled = [];
@@ -4320,16 +4321,17 @@ function buildPerfTaskSection(u) {
   });
 
   // Visual Arts standards with PT assessments (Art/Music tab only)
-  const vaStds   = (artVaAssignments[currentGrade] || {})[u] || [];
-  const vaCrit   = (artVaPtCriteria[currentGrade] || {})[u] || {};
+  const isArtPt  = detailUnitType === 'art';
+  const vaStds   = isArtPt ? ((artVaAssignments[currentGrade] || {})[u] || []) : [];
+  const vaCrit   = isArtPt ? ((artVaPtCriteria[currentGrade] || {})[u] || {}) : {};
   const ptVaStds = vaStds.filter(sid => {
     const rows = ((artVaAssessments[currentGrade] || {})[u] || {})[sid];
     return Array.isArray(rows) && rows.some(r => r.type === 'Performance Task');
   });
 
   // Music standards with PT assessments (Art/Music tab only)
-  const muStds   = (artMuAssignments[currentGrade] || {})[u] || [];
-  const muCrit   = (artMuPtCriteria[currentGrade] || {})[u] || {};
+  const muStds   = isArtPt ? ((artMuAssignments[currentGrade] || {})[u] || []) : [];
+  const muCrit   = isArtPt ? ((artMuPtCriteria[currentGrade] || {})[u] || {}) : {};
   const ptMuStds = muStds.filter(sid => {
     const rows = ((artMuAssessments[currentGrade] || {})[u] || {})[sid];
     return Array.isArray(rows) && rows.some(r => r.type === 'Performance Task');
@@ -4424,8 +4426,9 @@ function renderDetailView() {
   // Only show built-in SJ standards in detail screen; custom "catch-all" items (pool-only) are excluded
   const sjStds   = (activeSjAssignments()[currentGrade][u] || []).filter(sid => SJ_IDS.has(sid));
   const histStds = activeHistAssignments()[currentGrade][u] || [];
-  const vaStds   = (artVaAssignments[currentGrade] || {})[u] || [];
-  const muStds   = (artMuAssignments[currentGrade] || {})[u] || [];
+  const isArtView = detailUnitType === 'art';
+  const vaStds   = isArtView ? ((artVaAssignments[currentGrade] || {})[u] || []) : [];
+  const muStds   = isArtView ? ((artMuAssignments[currentGrade] || {})[u] || []) : [];
   const lookup   = buildLookup(currentGrade);
   const el     = document.getElementById('detailContent');
 
