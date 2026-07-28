@@ -1674,7 +1674,7 @@ function makeDefaultUnitDetails() {
   const a = {};
   ['6','7','8','9','10'].forEach(g => {
     a[g] = {};
-    ['1','2','3','4','5','6'].forEach(u => { a[g][u] = { eu: [], eq: [], overview: '', overviewPublished: false, texts: [], textsPublished: false, linkToSlides: '', linkToPlans: '', curriculumLinks: {} }; });
+    ['1','2','3','4','5','6'].forEach(u => { a[g][u] = { eu: [], eq: [], overview: '', overviewPublished: false, texts: [], textsPublished: false, linkToSlides: '', linkToPlans: '', linkToPerformanceTaskDescription: '', curriculumLinks: {} }; });
   });
   return a;
 }
@@ -1883,6 +1883,7 @@ function encodeUnitDetails(ud) {
         textsPublished:         !!d.textsPublished,
         linkToSlides:           d.linkToSlides || '',
         linkToPlans:            d.linkToPlans  || '',
+        linkToPerformanceTaskDescription: d.linkToPerformanceTaskDescription || '',
         curriculumLinks:        (d.curriculumLinks && typeof d.curriculumLinks === 'object') ? d.curriculumLinks : {},
       };
     });
@@ -1907,6 +1908,7 @@ function decodeUnitDetails(data) {
         textsPublished:   !!data[g][u].textsPublished,
         linkToSlides:     typeof data[g][u].linkToSlides === 'string' ? data[g][u].linkToSlides : '',
         linkToPlans:      typeof data[g][u].linkToPlans  === 'string' ? data[g][u].linkToPlans  : '',
+        linkToPerformanceTaskDescription: typeof data[g][u].linkToPerformanceTaskDescription === 'string' ? data[g][u].linkToPerformanceTaskDescription : '',
         curriculumLinks:  (data[g][u].curriculumLinks && typeof data[g][u].curriculumLinks === 'object') ? data[g][u].curriculumLinks : {},
       };
     });
@@ -4339,8 +4341,29 @@ function buildPerfTaskSection(u) {
 
   const header = `<div class="pool-section-hdr">Performance Tasks</div>`;
 
+  /* PT description link box — always shown, full-width, above the standard cards */
+  const ptDescUrl = (activeUnitDetails()[currentGrade][u] || {}).linkToPerformanceTaskDescription || '';
+  const ptDescBox = ptDescUrl
+    ? `<div class="unit-link-box has-link" style="margin:0 0 14px"
+           onclick="window.open('${ptDescUrl.replace(/"/g,'&quot;')}','_blank','noopener')"
+           title="Open Performance Task Description">
+         <button class="unit-link-edit-btn" onclick="event.stopPropagation();editPtDescLink()" title="Edit link">&#9998;</button>
+         <span class="unit-link-box-label">Link to Performance Task Description</span>
+         <span class="unit-link-box-hint">Click to open &#8599;</span>
+       </div>`
+    : `<div class="unit-link-box" id="linkBox-linkToPerformanceTaskDescription" style="margin:0 0 14px">
+         <span class="unit-link-box-label">Link to Performance Task Description</span>
+         <span class="unit-link-box-hint">Add link</span>
+         <div class="unit-link-editor" style="display:none" id="linkEditor-linkToPerformanceTaskDescription">
+           <input type="url" class="unit-link-input" id="linkInput-linkToPerformanceTaskDescription"
+                  placeholder="Paste URL here…"
+                  onkeydown="if(event.key==='Enter')savePtDescLink()">
+           <button class="unit-link-save-btn" onclick="savePtDescLink()">Save</button>
+         </div>
+       </div>`;
+
   if (ptStds.length === 0 && ptSjStds.length === 0 && ptHistStds.length === 0 && ptVaStds.length === 0 && ptMuStds.length === 0) {
-    return `${header}<div class="pt-empty">No Performance Task assessments assigned yet</div>`;
+    return `${header}${ptDescBox}<div class="pt-empty">No Performance Task assessments assigned yet</div>`;
   }
 
   const buildCard = (sid, criteria, color, updateFn, addFn) => {
@@ -4390,12 +4413,44 @@ function buildPerfTaskSection(u) {
     return buildCard(sid, criteria, MU_COLOR, 'updateMuPtCriterion', 'addMuPtCriterion');
   }).join('');
 
-  return `${header}${ccssCards}${sjCards}${histCards}${vaCards}${muCards}`;
+  return `${header}${ptDescBox}${ccssCards}${sjCards}${histCards}${vaCards}${muCards}`;
 }
 
 function renderPerfTaskSection() {
   const el = document.getElementById('perfTaskSection');
   if (el) el.innerHTML = buildPerfTaskSection(String(detailUnit));
+  attachPtDescLinkClick();
+}
+
+function savePtDescLink() {
+  const input = document.getElementById('linkInput-linkToPerformanceTaskDescription');
+  if (!input) return;
+  const url = input.value.trim();
+  if (!url) return;
+  const ud = activeUnitDetails()[currentGrade][String(detailUnit)];
+  ud.linkToPerformanceTaskDescription = url;
+  writeToFirestore();
+  renderPerfTaskSection();
+}
+
+function editPtDescLink() {
+  const ud = activeUnitDetails()[currentGrade][String(detailUnit)];
+  ud.linkToPerformanceTaskDescription = '';
+  writeToFirestore();
+  renderPerfTaskSection();
+}
+
+function attachPtDescLinkClick() {
+  const key = 'linkToPerformanceTaskDescription';
+  const box = document.getElementById('linkBox-' + key);
+  if (!box) return;
+  box.addEventListener('click', () => {
+    const editor = document.getElementById('linkEditor-' + key);
+    const hint   = box.querySelector('.unit-link-box-hint');
+    if (editor) { editor.style.display = 'flex'; if (hint) hint.style.display = 'none'; }
+    const inp = document.getElementById('linkInput-' + key);
+    if (inp) inp.focus();
+  });
 }
 
 function updatePtCriterion(sid, index, value) {
@@ -4691,6 +4746,7 @@ function renderDetailView() {
     `<div id="unitLinksRow">${buildUnitLinksRow(ud)}</div>`;
 
   attachLinkBoxClicks();
+  attachPtDescLinkClick();
   attachCurriculumLinkClicks(currItems);
   renderDetailSidebar();
 }
