@@ -832,6 +832,13 @@
       transition: color .14s;
     }
     .ud-add-btn:hover { color: var(--accent); }
+    .add-asmt-btn {
+      background: none; border: none; padding: 6px 0 0;
+      font: 500 .72rem 'Inter', sans-serif;
+      color: var(--text-light); cursor: pointer; display: block;
+      letter-spacing: .01em; transition: color .14s;
+    }
+    .add-asmt-btn:hover { color: var(--accent); }
 
     /* ── POOL TAGS (Genre / Performance) ────────────────── */
     .pool-tag {
@@ -4422,6 +4429,57 @@ function renderPerfTaskSection() {
   attachPtDescLinkClick();
 }
 
+/* ── Add assessment row (one per standard type) ─────── */
+function addAssessmentRow(sid) {
+  const u    = String(detailUnit);
+  const rows = getAssessmentRows(currentGrade, u, sid);
+  if (rows.length >= MAX_ASMT_ROWS) return;
+  rows.push({ type:'', date:'', description:'' });
+  writeToFirestore();
+  const el = document.getElementById(asmtBlockId(sid));
+  if (el) el.outerHTML = buildAsmtBlock(sid, rows, 'updateAssessment', 'handleDescInput', 'addAssessmentRow');
+}
+
+function addSjAssessmentRow(sid) {
+  const u    = String(detailUnit);
+  const rows = getSjAssessmentRows(currentGrade, u, sid);
+  if (rows.length >= MAX_ASMT_ROWS) return;
+  rows.push({ type:'', date:'', description:'' });
+  writeToFirestore();
+  const el = document.getElementById(asmtBlockId(sid));
+  if (el) el.outerHTML = buildAsmtBlock(sid, rows, 'updateSjAssessment', 'handleSjDescInput', 'addSjAssessmentRow');
+}
+
+function addHistAssessmentRow(sid) {
+  const u    = String(detailUnit);
+  const rows = getHistAssessmentRows(currentGrade, u, sid);
+  if (rows.length >= MAX_ASMT_ROWS) return;
+  rows.push({ type:'', date:'', description:'' });
+  writeToFirestore();
+  const el = document.getElementById(asmtBlockId(sid));
+  if (el) el.outerHTML = buildAsmtBlock(sid, rows, 'updateHistAssessment', 'handleHistDescInput', 'addHistAssessmentRow');
+}
+
+function addVaAssessmentRow(sid) {
+  const u    = String(detailUnit);
+  const rows = getVaAssessmentRows(currentGrade, u, sid);
+  if (rows.length >= MAX_ASMT_ROWS) return;
+  rows.push({ type:'', date:'', description:'' });
+  writeToFirestore();
+  const el = document.getElementById(asmtBlockId(sid));
+  if (el) el.outerHTML = buildAsmtBlock(sid, rows, 'updateVaAssessment', 'handleVaDescInput', 'addVaAssessmentRow');
+}
+
+function addMuAssessmentRow(sid) {
+  const u    = String(detailUnit);
+  const rows = getMuAssessmentRows(currentGrade, u, sid);
+  if (rows.length >= MAX_ASMT_ROWS) return;
+  rows.push({ type:'', date:'', description:'' });
+  writeToFirestore();
+  const el = document.getElementById(asmtBlockId(sid));
+  if (el) el.outerHTML = buildAsmtBlock(sid, rows, 'updateMuAssessment', 'handleMuDescInput', 'addMuAssessmentRow');
+}
+
 function savePtDescLink() {
   const input = document.getElementById('linkInput-linkToPerformanceTaskDescription');
   if (!input) return;
@@ -4473,6 +4531,50 @@ function addPtCriterion(sid) {
 }
 
 /* =====================================================
+   ASSESSMENT BLOCK BUILDER (shared by all 5 standard types)
+===================================================== */
+const MAX_ASMT_ROWS = 5;
+
+function asmtBlockId(sid) { return 'asmts-' + sid.replace(/[\.:]/g, '_'); }
+
+function buildAsmtBlock(sid, rows, updateFn, descFn, addFn) {
+  const numVisible = Math.max(2, rows.length);
+  let html = '';
+  for (let i = 0; i < numVisible; i++) {
+    const row  = rows[i] || { type:'', date:'', description:'' };
+    const desc = row.description || '';
+    const wc   = wordCount(desc);
+    html += `
+      <div class="asmt-row">
+        <div class="asmt-row-top">
+          <span class="asmt-label">Assessment ${i + 1}</span>
+          <select class="asmt-select"
+                  onchange="${updateFn}('${sid}',${i},'type',this.value)">
+            <option value=""                 ${row.type===''                 ?'selected':''}>&#8212; select type &#8212;</option>
+            <option value="Quiz"             ${row.type==='Quiz'             ?'selected':''}>Quiz</option>
+            <option value="Writing Task"     ${row.type==='Writing Task'     ?'selected':''}>Writing Task</option>
+            <option value="Project"          ${row.type==='Project'          ?'selected':''}>Project</option>
+            <option value="Final Assessment" ${row.type==='Final Assessment' ?'selected':''}>Final Assessment</option>
+            <option value="Performance Task" ${row.type==='Performance Task' ?'selected':''}>Performance Task</option>
+          </select>
+          <input type="date" class="asmt-date" value="${row.date || ''}"
+                 onchange="${updateFn}('${sid}',${i},'date',this.value)">
+        </div>
+        <div class="asmt-row-bottom">
+          <input type="text" class="asmt-desc" placeholder="Brief description..."
+                 value="${desc.replace(/"/g, '&quot;')}"
+                 oninput="${descFn}('${sid}',${i},this)">
+          <span class="asmt-word-count${wc >= MAX_WORDS ? ' at-limit' : ''}">${wc}/${MAX_WORDS}</span>
+        </div>
+      </div>`;
+  }
+  const addBtn = rows.length < MAX_ASMT_ROWS
+    ? `<button class="add-asmt-btn" onclick="${addFn}('${sid}')">+ Add assessment</button>`
+    : '';
+  return `<div id="${asmtBlockId(sid)}" class="asmt-rows">${html}${addBtn}</div>`;
+}
+
+/* =====================================================
    RENDER — UNIT DETAIL VIEW
 ===================================================== */
 function renderDetailView() {
@@ -4509,41 +4611,12 @@ function renderDetailView() {
         const color = strandColor(sid);
         const rows  = getAssessmentRows(currentGrade, detailUnit, sid);
 
-        const asmtRows = [0, 1].map(i => {
-          const row  = rows[i] || { type:'', date:'', description:'' };
-          const desc = row.description || '';
-          const wc   = wordCount(desc);
-          return `
-            <div class="asmt-row">
-              <div class="asmt-row-top">
-                <span class="asmt-label">Assessment ${i + 1}</span>
-                <select class="asmt-select"
-                        onchange="updateAssessment('${sid}',${i},'type',this.value)">
-                  <option value=""                 ${row.type===''                 ?'selected':''}>&#8212; select type &#8212;</option>
-                  <option value="Quiz"             ${row.type==='Quiz'             ?'selected':''}>Quiz</option>
-                  <option value="Writing Task"     ${row.type==='Writing Task'     ?'selected':''}>Writing Task</option>
-                  <option value="Project"          ${row.type==='Project'          ?'selected':''}>Project</option>
-                  <option value="Final Assessment" ${row.type==='Final Assessment' ?'selected':''}>Final Assessment</option>
-                  <option value="Performance Task" ${row.type==='Performance Task' ?'selected':''}>Performance Task</option>
-                </select>
-                <input type="date" class="asmt-date" value="${row.date || ''}"
-                       onchange="updateAssessment('${sid}',${i},'date',this.value)">
-              </div>
-              <div class="asmt-row-bottom">
-                <input type="text" class="asmt-desc" placeholder="Brief description..."
-                       value="${desc.replace(/"/g, '&quot;')}"
-                       oninput="handleDescInput('${sid}',${i},this)">
-                <span class="asmt-word-count${wc >= MAX_WORDS ? ' at-limit' : ''}">${wc}/${MAX_WORDS}</span>
-              </div>
-            </div>`;
-        }).join('');
-
         return `
           <div class="std-detail-card" style="border-left-color:${color}">
             <div class="std-detail-code" style="color:${color}">${std.id}</div>
             <div class="std-detail-desc">${std.desc}</div>
             <hr class="asmt-divider">
-            <div class="asmt-rows">${asmtRows}</div>
+            ${buildAsmtBlock(sid, rows, 'updateAssessment', 'handleDescInput', 'addAssessmentRow')}
           </div>`;
       }).join('');
     }
@@ -4555,41 +4628,12 @@ function renderDetailView() {
         const std  = SJ_LOOKUP[sid] || { id: sid, desc: '' };
         const rows = getSjAssessmentRows(currentGrade, detailUnit, sid);
 
-        const asmtRows = [0, 1].map(i => {
-          const row  = rows[i] || { type:'', date:'', description:'' };
-          const desc = row.description || '';
-          const wc   = wordCount(desc);
-          return `
-            <div class="asmt-row">
-              <div class="asmt-row-top">
-                <span class="asmt-label">Assessment ${i + 1}</span>
-                <select class="asmt-select"
-                        onchange="updateSjAssessment('${sid}',${i},'type',this.value)">
-                  <option value=""                 ${row.type===''                 ?'selected':''}>&#8212; select type &#8212;</option>
-                  <option value="Quiz"             ${row.type==='Quiz'             ?'selected':''}>Quiz</option>
-                  <option value="Writing Task"     ${row.type==='Writing Task'     ?'selected':''}>Writing Task</option>
-                  <option value="Project"          ${row.type==='Project'          ?'selected':''}>Project</option>
-                  <option value="Final Assessment" ${row.type==='Final Assessment' ?'selected':''}>Final Assessment</option>
-                  <option value="Performance Task" ${row.type==='Performance Task' ?'selected':''}>Performance Task</option>
-                </select>
-                <input type="date" class="asmt-date" value="${row.date || ''}"
-                       onchange="updateSjAssessment('${sid}',${i},'date',this.value)">
-              </div>
-              <div class="asmt-row-bottom">
-                <input type="text" class="asmt-desc" placeholder="Brief description..."
-                       value="${desc.replace(/"/g, '&quot;')}"
-                       oninput="handleSjDescInput('${sid}',${i},this)">
-                <span class="asmt-word-count${wc >= MAX_WORDS ? ' at-limit' : ''}">${wc}/${MAX_WORDS}</span>
-              </div>
-            </div>`;
-        }).join('');
-
         return `
           <div class="std-detail-card" style="border-left-color:${SJ_COLOR}">
             <div class="std-detail-code" style="color:${SJ_COLOR}">${std.id}</div>
             ${std.desc ? `<div class="std-detail-desc">${std.desc}</div>` : ''}
             <hr class="asmt-divider">
-            <div class="asmt-rows">${asmtRows}</div>
+            ${buildAsmtBlock(sid, rows, 'updateSjAssessment', 'handleSjDescInput', 'addSjAssessmentRow')}
           </div>`;
       }).join('');
     }
@@ -4600,40 +4644,11 @@ function renderDetailView() {
       bottomHtml += histStds.map(sid => {
         const rows = getHistAssessmentRows(currentGrade, detailUnit, sid);
 
-        const asmtRows = [0, 1].map(i => {
-          const row  = rows[i] || { type:'', date:'', description:'' };
-          const desc = row.description || '';
-          const wc   = wordCount(desc);
-          return `
-            <div class="asmt-row">
-              <div class="asmt-row-top">
-                <span class="asmt-label">Assessment ${i + 1}</span>
-                <select class="asmt-select"
-                        onchange="updateHistAssessment('${sid}',${i},'type',this.value)">
-                  <option value=""                 ${row.type===''                 ?'selected':''}>&#8212; select type &#8212;</option>
-                  <option value="Quiz"             ${row.type==='Quiz'             ?'selected':''}>Quiz</option>
-                  <option value="Writing Task"     ${row.type==='Writing Task'     ?'selected':''}>Writing Task</option>
-                  <option value="Project"          ${row.type==='Project'          ?'selected':''}>Project</option>
-                  <option value="Final Assessment" ${row.type==='Final Assessment' ?'selected':''}>Final Assessment</option>
-                  <option value="Performance Task" ${row.type==='Performance Task' ?'selected':''}>Performance Task</option>
-                </select>
-                <input type="date" class="asmt-date" value="${row.date || ''}"
-                       onchange="updateHistAssessment('${sid}',${i},'date',this.value)">
-              </div>
-              <div class="asmt-row-bottom">
-                <input type="text" class="asmt-desc" placeholder="Brief description..."
-                       value="${desc.replace(/"/g, '&quot;')}"
-                       oninput="handleHistDescInput('${sid}',${i},this)">
-                <span class="asmt-word-count${wc >= MAX_WORDS ? ' at-limit' : ''}">${wc}/${MAX_WORDS}</span>
-              </div>
-            </div>`;
-        }).join('');
-
         return `
           <div class="std-detail-card" style="border-left-color:${HIST_COLOR}">
             <div class="std-detail-code" style="color:${HIST_COLOR}">${sid}</div>
             <hr class="asmt-divider">
-            <div class="asmt-rows">${asmtRows}</div>
+            ${buildAsmtBlock(sid, rows, 'updateHistAssessment', 'handleHistDescInput', 'addHistAssessmentRow')}
           </div>`;
       }).join('');
     }
@@ -4645,41 +4660,12 @@ function renderDetailView() {
         const std  = VA_STANDARDS.find(s => s.id === sid) || { id: sid, desc: '' };
         const rows = getVaAssessmentRows(currentGrade, detailUnit, sid);
 
-        const asmtRows = [0, 1].map(i => {
-          const row  = rows[i] || { type:'', date:'', description:'' };
-          const desc = row.description || '';
-          const wc   = wordCount(desc);
-          return `
-            <div class="asmt-row">
-              <div class="asmt-row-top">
-                <span class="asmt-label">Assessment ${i + 1}</span>
-                <select class="asmt-select"
-                        onchange="updateVaAssessment('${sid}',${i},'type',this.value)">
-                  <option value=""                 ${row.type===''                 ?'selected':''}>&#8212; select type &#8212;</option>
-                  <option value="Quiz"             ${row.type==='Quiz'             ?'selected':''}>Quiz</option>
-                  <option value="Writing Task"     ${row.type==='Writing Task'     ?'selected':''}>Writing Task</option>
-                  <option value="Project"          ${row.type==='Project'          ?'selected':''}>Project</option>
-                  <option value="Final Assessment" ${row.type==='Final Assessment' ?'selected':''}>Final Assessment</option>
-                  <option value="Performance Task" ${row.type==='Performance Task' ?'selected':''}>Performance Task</option>
-                </select>
-                <input type="date" class="asmt-date" value="${row.date || ''}"
-                       onchange="updateVaAssessment('${sid}',${i},'date',this.value)">
-              </div>
-              <div class="asmt-row-bottom">
-                <input type="text" class="asmt-desc" placeholder="Brief description..."
-                       value="${desc.replace(/"/g, '&quot;')}"
-                       oninput="handleVaDescInput('${sid}',${i},this)">
-                <span class="asmt-word-count${wc >= MAX_WORDS ? ' at-limit' : ''}">${wc}/${MAX_WORDS}</span>
-              </div>
-            </div>`;
-        }).join('');
-
         return `
           <div class="std-detail-card" style="border-left-color:${VA_COLOR}">
             <div class="std-detail-code" style="color:${VA_COLOR}">${std.id}</div>
             ${std.desc ? `<div class="std-detail-desc">${std.desc}</div>` : ''}
             <hr class="asmt-divider">
-            <div class="asmt-rows">${asmtRows}</div>
+            ${buildAsmtBlock(sid, rows, 'updateVaAssessment', 'handleVaDescInput', 'addVaAssessmentRow')}
           </div>`;
       }).join('');
     }
@@ -4691,41 +4677,12 @@ function renderDetailView() {
         const std  = MU_STANDARDS.find(s => s.id === sid) || { id: sid, desc: '' };
         const rows = getMuAssessmentRows(currentGrade, detailUnit, sid);
 
-        const asmtRows = [0, 1].map(i => {
-          const row  = rows[i] || { type:'', date:'', description:'' };
-          const desc = row.description || '';
-          const wc   = wordCount(desc);
-          return `
-            <div class="asmt-row">
-              <div class="asmt-row-top">
-                <span class="asmt-label">Assessment ${i + 1}</span>
-                <select class="asmt-select"
-                        onchange="updateMuAssessment('${sid}',${i},'type',this.value)">
-                  <option value=""                 ${row.type===''                 ?'selected':''}>&#8212; select type &#8212;</option>
-                  <option value="Quiz"             ${row.type==='Quiz'             ?'selected':''}>Quiz</option>
-                  <option value="Writing Task"     ${row.type==='Writing Task'     ?'selected':''}>Writing Task</option>
-                  <option value="Project"          ${row.type==='Project'          ?'selected':''}>Project</option>
-                  <option value="Final Assessment" ${row.type==='Final Assessment' ?'selected':''}>Final Assessment</option>
-                  <option value="Performance Task" ${row.type==='Performance Task' ?'selected':''}>Performance Task</option>
-                </select>
-                <input type="date" class="asmt-date" value="${row.date || ''}"
-                       onchange="updateMuAssessment('${sid}',${i},'date',this.value)">
-              </div>
-              <div class="asmt-row-bottom">
-                <input type="text" class="asmt-desc" placeholder="Brief description..."
-                       value="${desc.replace(/"/g, '&quot;')}"
-                       oninput="handleMuDescInput('${sid}',${i},this)">
-                <span class="asmt-word-count${wc >= MAX_WORDS ? ' at-limit' : ''}">${wc}/${MAX_WORDS}</span>
-              </div>
-            </div>`;
-        }).join('');
-
         return `
           <div class="std-detail-card" style="border-left-color:${MU_COLOR}">
             <div class="std-detail-code" style="color:${MU_COLOR}">${std.id}</div>
             ${std.desc ? `<div class="std-detail-desc">${std.desc}</div>` : ''}
             <hr class="asmt-divider">
-            <div class="asmt-rows">${asmtRows}</div>
+            ${buildAsmtBlock(sid, rows, 'updateMuAssessment', 'handleMuDescInput', 'addMuAssessmentRow')}
           </div>`;
       }).join('');
     }
